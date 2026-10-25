@@ -191,6 +191,12 @@ export const GEAR_SETS_2 = [
     4: [self(m('weakenDef', 30), m('ccRes', 20))],
     6: [self(m('air', 30), m('finalDmg', 30))],
   } },
+  // Warlord : seul équipement évolutif (R1 à R5). Version saisie : R4.
+  { id: 'gear-warlord', name: 'Warlord [R4]', tiers: {
+    2: [self(m('aid', 25), m('punch', 30))], // + Force / Agilité / Chakra / Puissance 15 000
+    4: [self(m('weakenDef', 45), m('weakenAtk', 50), m('hp', 30), m('ccRate', 3), m('ccRes', 3))], // + Agilité 20 000
+    6: [self(m('dr', 70), m('air', 50), m('atk', 30), m('ccRate', 5), m('ccRes', 5))], // + Agilité 20 000, Puissance 120 000
+  } },
 ];
 
 export const ACCESSORY_SETS_2 = [
@@ -358,4 +364,11 @@ export const ACCESSORY_SETS_2 = [
     p('agility', self(m('punch', 20), m('ccRate', 20))),
     p('power', self(m('air', 20), m('hp', 20))),
   ], full: [] },
+  // Accessoires Warlord (R1 ou R2). Version saisie : R1.
+  { id: 'acc-warlord', name: 'Accessoires Warlord [R1]', pairs: [
+    p('force', self(m('atk', 25), m('ccRes', 40), m('air', 5))), // + Force 40 000
+    p('chakra', self(m('atk', 25), m('dr', 30))), // + Chakra 40 000
+    p('agility', self(m('atk', 25), m('air', 25), m('ccRate', 10))), // + Agilité 40 000
+    p('power', self(m('hp', 30), m('ccRate', 30), m('finalReduction', 5))), // + Puissance 90 000
+  ], full: [self(m('weakenAtk', 30), m('weakenDef', 30), m('air', 25), m('dr', 25), m('ccRes', 30), m('finalDmg', 5), m('hp', 5))] },
 ];
