@@ -1,24 +1,28 @@
 // Moteur de combat Myninja : tour par tour, ordre par vitesse, formation 1-3-3.
 import * as F from './formulas.js';
-import { STATUSES } from './statuses.js';
+import { STATUSES, UNCLEANSABLE_DOTS } from './statuses.js';
 
 // Règles dont on n'est pas sûr à 100 % : regroupées ici pour pouvoir les ajuster.
 export const DEFAULT_RULES = {
   normalFury: 50,          // fury gagnée par une attaque normale
   specialCost: 100,        // fury nécessaire / dépensée pour la spéciale
-  specialTeamFury: 33,     // fury rendue à toute la formation après une spéciale
+  specialTeamFury: 33,     // fury rendue à toute la formation si la spéciale ne précise rien
   blockReduction: 33,      // % de dégâts retirés par un blocage
   critFirst: true,         // critique testé avant le blocage (les deux ne peuvent pas arriver ensemble)
-  aidDamagePct: 10,        // dégâts d'une action d'aide (punch) en % d'une attaque normale (Excel : Aid dmg = DMG/10)
+  aidDamagePct: 10,        // dégâts d'une action d'aide en % d'une attaque normale (Excel : Aid dmg = DMG/10)
   aidGivesFury: true,      // l'action d'aide donne-t-elle de la fury ?
-  aidChains: false,        // un ninja qui vient d'aider peut-il à son tour donner un punch ?
+  aidChains: false,        // un ninja qui vient d'aider peut-il à son tour déclencher une aide ?
   maxRounds: 20,           // limite de rounds ; au-delà : la formation avec le plus de PV restants gagne
   defenseMode: 'corrected',// 'excel' = reproduit le bug de la cellule DEF de l'Excel
+  applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
+  punchIsExtraTurn: true,  // « punch rate » des descriptions = Tour Bonus (sinon = Aide)
+  roleFallback: true,      // une attaque sur un poste vide (ex. « les supports ») vise la première ligne à la place
 };
 
 export const ROWS = { vanguard: 'V', assaulter: 'A', supporter: 'S' };
 const ROW_ORDER = ['V', 'A', 'S'];
 export const ROLE_LABEL = { vanguard: 'Avant-garde', assaulter: 'Attaquant', supporter: 'Support' };
+export const NATURES = { none: 'Non activé', earth: 'Terre', fire: 'Feu', thunder: 'Foudre', water: 'Eau', wind: 'Vent' };
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -47,38 +51,78 @@ export function validateTeam(team) {
   return errors;
 }
 
+// Talents et compétences effectifs d'un ninja selon son niveau d'éveil.
+export function resolveKit(ninja, level) {
+  const aw = ninja.awakenings || [];
+  const lvl = Math.min(level ?? aw.length, aw.length);
+  let awTalents = [];
+  const extraEffects = [];
+  const extraHits = [];
+  let special = ninja.special;
+  let base = ninja.base;
+  for (let i = 0; i < lvl; i++) {
+    const a = aw[i];
+    if (a.base) base = a.base;
+    if (a.replacePrevious) awTalents = [];
+    awTalents.push(...(a.talents || []));
+    if (a.specialEffects) extraEffects.push(...a.specialEffects);
+    if (a.specialHits) extraHits.push(...a.specialHits);
+    if (a.special) special = a.special;
+  }
+  if (special && (extraEffects.length || extraHits.length)) {
+    special = { ...special, effects: [...(special.effects || []), ...extraEffects], hits: [...skillHits(special), ...extraHits] };
+  }
+  return { talents: [...(ninja.talents || []), ...awTalents], special, normal: ninja.normal || {}, base, level: lvl };
+}
+
+function skillHits(skill) {
+  if (skill.noDamage) return [];
+  if (skill.hits) return skill.hits;
+  return [{ target: skill.target || 'front-row', pct: skill.skillPct ?? 100 }];
+}
+
 // ---------- Création des unités ----------
 
 function makeUnit(member, team, index) {
   const n = member.ninja;
-  const st = { ...member.stats };
-  const row = ROWS[n.role];
+  const kit = resolveKit(n, member.awakening);
   return {
     uid: `${team}-${index}`,
     team,
     ninja: n,
+    kit,
     name: member.label || n.name,
     role: n.role,
+    nature: member.nature || n.nature || 'none',
+    tags: n.tags || [],
     attackType: member.attackType || n.attackType || (n.role === 'supporter' ? 'magic' : 'physical'),
-    row,
+    row: ROWS[n.role],
     pos: member.pos ?? 0,
-    stats: st,
-    maxHp: st.hp,
-    hp: st.hp,
-    fury: st.fury ?? 100,
+    stats: { ...member.stats },
+    maxHp: member.stats.hp || 1,
+    hp: member.stats.hp || 1,
+    fury: member.stats.fury ?? 100,
     alive: true,
     effects: [],
-    passives: [],      // modificateurs permanents (talents, équipements) : { stat, value, kind, source }
-    procs: [],         // effets d'équipement déclenchés à chaque attaque
+    passives: [],   // modificateurs permanents : { stat, value, kind, source, scaleSrc?, per? }
+    immune: new Set(),
+    triggers: [],   // { on, chance, effects, once, used }
+    procs: [],      // effets d'équipement déclenchés à chaque attaque
     equipment: member.equipment || [],
   };
 }
 
 // ---------- Lecture des modificateurs ----------
 
+const lostPct = (u) => Math.max(0, 100 * (1 - u.hp / u.maxHp));
+
 function allMods(u, stat) {
   const out = [];
-  for (const p of u.passives) if (p.stat === stat) out.push({ value: p.value, kind: p.kind || 'talent' });
+  for (const p of u.passives) {
+    if (p.stat !== stat) continue;
+    const v = p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
+    if (v) out.push({ value: v, kind: p.kind || 'talent' });
+  }
   for (const e of u.effects) for (const m of e.mods || []) if (m.stat === stat) out.push({ value: m.value, kind: m.kind || 'icon' });
   return out;
 }
@@ -86,24 +130,25 @@ const modSum = (u, stat) => allMods(u, stat).reduce((a, m) => a + m.value, 0);
 const hasFlag = (u, flag) => u.effects.some((e) => e.flags && e.flags[flag]);
 const stat = (u, s) => (u.stats[s] || 0) + modSum(u, s);
 
-function atkParts(u) {
-  const mods = allMods(u, 'atk');
+function atkParts(u, type = u.attackType) {
+  const key = type === 'magic' ? 'matk' : 'patk';
+  const mods = [...allMods(u, 'atk'), ...allMods(u, key)];
   return {
-    atk: u.attackType === 'magic' ? u.stats.matk || 0 : u.stats.patk || 0,
+    atk: u.stats[key] || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
     icons: mods.filter((m) => m.kind !== 'talent').reduce((a, m) => a + m.value, 0),
     negIcons: mods.filter((m) => m.kind !== 'talent' && m.value < 0).reduce((a, m) => a - m.value, 0),
   };
 }
 
-function defEff(att, tgt, rules) {
-  const key = att.attackType === 'magic' ? 'mdef' : 'pdef';
+function defEff(att, tgt, type, rules) {
+  const key = type === 'magic' ? 'mdef' : 'pdef';
   const mods = [...allMods(tgt, 'def'), ...allMods(tgt, key)];
   return F.effectiveDefense({
     def: tgt.stats[key] || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
     icons: mods.filter((m) => m.kind !== 'talent').reduce((a, m) => a + m.value, 0),
-    ignoreDef: modSum(att, 'ignoreDef'),
+    ignoreDef: att ? modSum(att, 'ignoreDef') : 0,
     immuneIgnoreDef: modSum(tgt, 'immuneIgnoreDef'),
     mode: rules.defenseMode,
   });
@@ -126,14 +171,20 @@ const SHORTHANDS = {
   enemies: { side: 'enemy', pick: 'all' },
   'front-row': { side: 'enemy', pick: 'front-row' },
 };
+const asList = (v) => (v == null ? null : Array.isArray(v) ? v : [v]);
 
-function resolve(sel, caster, units, rng) {
+function resolve(sel, caster, units, rng, rules) {
   if (typeof sel === 'string') sel = SHORTHANDS[sel] || { side: 'enemy', pick: sel };
   if (sel.side === 'self') return [caster];
   let pool = units.filter((u) => u.alive && (sel.side === 'ally' ? u.team === caster.team : u.team !== caster.team));
-  if (sel.side === 'ally' && sel.excludeSelf) pool = pool.filter((u) => u !== caster);
-  if (sel.role) pool = pool.filter((u) => u.role === sel.role);
-  if (sel.tag) pool = pool.filter((u) => (u.ninja.tags || []).includes(sel.tag));
+  if (sel.excludeSelf) pool = pool.filter((u) => u !== caster);
+  const roles = asList(sel.role), natures = asList(sel.nature);
+  if (roles) pool = pool.filter((u) => roles.includes(u.role));
+  if (natures) pool = pool.filter((u) => natures.includes(u.nature));
+  if (sel.tag) pool = pool.filter((u) => u.tags.includes(sel.tag));
+  if (!pool.length && roles && sel.fallback !== false && rules?.roleFallback && sel.side !== 'ally') {
+    return resolve({ side: sel.side, pick: 'front-row' }, caster, units, rng, rules);
+  }
   const count = sel.count || 1;
   const sortBy = (fn, dir) => [...pool].sort((a, b) => dir * (fn(a) - fn(b))).slice(0, count);
   switch (sel.pick || 'all') {
@@ -151,6 +202,8 @@ function resolve(sel, caster, units, rng) {
     case 'lowest-hp-pct': return sortBy((u) => u.hp / u.maxHp, 1);
     case 'highest-atk': return sortBy((u) => atkParts(u).atk, -1);
     case 'highest-speed': return sortBy((u) => currentSpeed(u), -1);
+    case 'highest-air': return sortBy((u) => stat(u, 'air'), -1);
+    case 'highest-ccres': return sortBy((u) => stat(u, 'ccRes'), -1);
     case 'random': {
       const p = [...pool], out = [];
       while (p.length && out.length < count) out.push(p.splice(Math.floor(rng() * p.length), 1)[0]);
@@ -178,33 +231,61 @@ export function simulate(teamA, teamB, opts = {}) {
   const who = (u) => `${u.name}${u.team === 0 ? ' (A)' : ' (B)'}`;
   const hpTxt = (u) => `${fmtPct((100 * Math.max(0, u.hp)) / u.maxHp)} PV`;
   const roll = (p) => rng() < p;
+  const R = (sel, caster) => resolve(sel, caster, units, rng, rules);
+  const extraTurnChance = (u) => stat(u, 'extraTurn') + (rules.punchIsExtraTurn ? modSum(u, 'punch') : 0);
+  const aidChance = (u) => stat(u, 'aid') + (rules.punchIsExtraTurn ? 0 : modSum(u, 'punch'));
 
-  // --- application des talents et équipements ---
-  function applyPassive(owner, p, source) {
-    const targets = resolve(p.to || 'self', owner, units, rng);
+  // --- talents, éveils et équipements ---
+  function applyEntry(owner, p, source) {
+    if (p.on) { owner.triggers.push({ ...p, source, used: false }); return; }
+    const targets = R(p.to || 'self', owner);
     for (const t of targets) {
-      for (const m of p.mods || []) t.passives.push({ ...m, kind: m.kind || 'talent', source });
-      if (p.status) addStatus(owner, t, { status: p.status, value: p.value, duration: Infinity }, source, true);
+      for (const m of p.mods || []) {
+        t.passives.push({ ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}) });
+      }
+      for (const im of p.immune || []) t.immune.add(im);
+      if (p.status) addStatus(owner, t, { status: p.status, value: p.value, duration: Infinity }, true);
     }
   }
   for (const u of units) {
-    for (const p of u.ninja.talents || []) applyPassive(u, p, `talent ${u.ninja.name}`);
+    const b = u.kit.base;
+    if (rules.applyBaseLine && b) {
+      for (const [k, v] of Object.entries(b)) if (typeof v === 'number') u.passives.push({ stat: k, value: v, kind: 'talent', source: 'base' });
+    }
+    for (const p of u.kit.talents) applyEntry(u, p, `talent ${u.ninja.name}`);
     for (const eq of u.equipment) {
-      for (const p of eq.passives || []) applyPassive(u, p, eq.name);
+      for (const p of eq.passives || []) applyEntry(u, p, eq.name);
       for (const pr of eq.procs || []) u.procs.push({ ...pr, source: eq.name });
     }
   }
+  for (const u of units) {
+    u.maxHp = (u.stats.hp || 1) * (1 + modSum(u, 'hp') / 100);
+    u.hp = u.maxHp;
+  }
 
   // --- états ---
-  function addStatus(src, tgt, eff, source, silent = false) {
-    const def = STATUSES[eff.status] || STATUSES.customBuff;
+  function dodgeKind(src, tgt) {
+    if (!src || src.team === tgt.team) return null;
+    const e = tgt.effects.find((x) => x.flags?.superDodge && !src.immune.has(x.flags.superDodge));
+    return e ? e.name : null;
+  }
+
+  function addStatus(src, tgt, eff, silent = false) {
+    const def = STATUSES[eff.status] || (eff.type === 'debuff' ? STATUSES.customDebuff : STATUSES.customBuff);
     const type = eff.type || def.type;
-    if (!tgt.alive) return false;
-    if (type === 'buff' && hasFlag(tgt, 'noBuffs')) { if (!silent) L('info', `${who(tgt)} ne peut pas recevoir de buff (${def.name} bloqué).`); return false; }
-    if ((type === 'debuff' || type === 'dot') && hasFlag(tgt, 'debuffImmune')) { if (!silent) L('info', `${who(tgt)} est immunisé aux debuffs.`); return false; }
-    if (type === 'cc' && hasFlag(tgt, 'ccImmune')) { if (!silent) L('info', `${who(tgt)} est immunisé aux CC.`); return false; }
-    const value = eff.value ?? def.value;
     const name = eff.name || def.name;
+    if (!tgt.alive) return false;
+    const hostile = type !== 'buff';
+    const say = (m) => { if (!silent) L('info', m); };
+    if (eff.status && tgt.immune.has(eff.status)) { say(`${who(tgt)} est immunisé à ${name}.`); return false; }
+    if (hostile && src && src.team !== tgt.team) {
+      const dk = dodgeKind(src, tgt);
+      if (dk) { say(`${who(tgt)} évite ${name} (${dk}).`); return false; }
+    }
+    if (type === 'buff' && hasFlag(tgt, 'noBuffs')) { say(`${who(tgt)} ne peut pas recevoir de buff (${name} bloqué).`); return false; }
+    if ((type === 'debuff' || type === 'dot') && hasFlag(tgt, 'debuffImmune')) { say(`${who(tgt)} est immunisé aux debuffs (${name}).`); return false; }
+    if (type === 'cc' && hasFlag(tgt, 'ccImmune')) { say(`${who(tgt)} est immunisé aux contrôles (${name}).`); return false; }
+    const value = eff.value ?? def.value;
     const e = {
       id: eff.status || name,
       name,
@@ -213,31 +294,47 @@ export function simulate(teamA, teamB, opts = {}) {
       flags: { ...(def.flags || {}), ...(eff.flags || {}) },
       mods: eff.mods ? eff.mods.map((m) => ({ kind: 'icon', ...m })) : def.mods ? def.mods(value) : [],
       value,
-      remaining: eff.duration ?? 1,
+      remaining: eff.duration ?? 2,
       fresh: current === tgt, // posé pendant le tour de son porteur : ne décompte pas ce tour-ci
       dot: eff.dot,
       source: src,
     };
     tgt.effects = tgt.effects.filter((x) => !(x.id === e.id && x.source === src));
     tgt.effects.push(e);
-    if (!silent) L('effect', `${who(tgt)} reçoit ${name}${value != null && !e.dot ? ` (${value} %)` : ''}${Number.isFinite(e.remaining) ? ` pour ${e.remaining} tour(s)` : ''}.`);
+    if (!silent) {
+      const v = value != null && !e.dot && def.mods ? ` (${value} %)` : '';
+      L('effect', `${who(tgt)} reçoit ${name}${v}${Number.isFinite(e.remaining) ? ` pour ${e.remaining} tour(s)` : ''}.`, { target: tgt.uid });
+    }
     return true;
+  }
+
+  function kill(u, src, kind) {
+    const rev = u.triggers.find((t) => t.on === 'death' && !(t.once !== false && t.used));
+    if (rev) {
+      rev.used = true;
+      const pct = rev.effects.find((e) => e.revive)?.revive ?? 50;
+      u.hp = u.maxHp * pct / 100;
+      u.effects = u.effects.filter((e) => e.type === 'buff');
+      L('death', `✨ ${who(u)} tombe${src ? ` sous les coups de ${who(src)}` : ''} mais ressuscite avec ${pct} % PV.`, { target: u.uid });
+      runEffects(u, rev.effects.filter((e) => !e.revive), { attacker: src });
+      return;
+    }
+    u.hp = 0;
+    u.alive = false;
+    L('death', `💀 ${who(u)} est mis K.O.${src ? ` par ${who(src)}` : ''} (${kind}).`, { target: u.uid });
   }
 
   // msg : texte du coup, journalisé avant l'éventuel K.O.
   function damage(tgt, amount, src, kind, msg) {
+    if (!tgt.alive) return;
     tgt.hp -= amount;
     if (msg) L(msg.type, msg.text(), msg.extra);
-    if (tgt.hp <= 0 && tgt.alive) {
-      tgt.hp = 0;
-      tgt.alive = false;
-      L('death', `💀 ${who(tgt)} est mis K.O.${src ? ` par ${who(src)}` : ''} (${kind}).`, { target: tgt.uid });
-    }
+    if (tgt.hp <= 0) kill(tgt, src, kind);
   }
 
   function heal(src, tgt, pctHeal) {
     if (!tgt.alive) return;
-    if (hasFlag(tgt, 'noHeal')) { L('info', `${who(tgt)} ne peut pas être soigné (Untreatment).`); return; }
+    if (hasFlag(tgt, 'noHeal')) { L('info', `${who(tgt)} ne peut pas être soigné.`); return; }
     const a = atkParts(src);
     const amount = F.healAmount({
       atkTalentOnly: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
@@ -253,18 +350,26 @@ export function simulate(teamA, teamB, opts = {}) {
       fury: src.fury,
       healDebuff: modSum(tgt, 'healCut'),
     });
-    const real = Math.min(amount, tgt.maxHp - tgt.hp);
+    const real = Math.max(0, Math.min(amount, tgt.maxHp - tgt.hp));
     tgt.hp += real;
-    L('heal', `${who(src)} soigne ${who(tgt)} de ${fmt(real)} → ${hpTxt(tgt)}.`, { amount: real });
+    if (real > 0) L('heal', `${who(src)} soigne ${who(tgt)} de ${fmt(real)} → ${hpTxt(tgt)}.`, { actor: src.uid, amount: real });
   }
 
-  // Un coup direct d'une compétence sur une cible. Renvoie true si l'attaque a touché.
-  function strike(att, tgt, skillPct, mult, label) {
-    if (hasFlag(tgt, 'superDodge')) { L('miss', `${who(tgt)} esquive totalement (Super Dodge).`); return false; }
-    if (!roll(F.chance(stat(att, 'hit'), stat(tgt, 'dodge')))) { L('miss', `${who(att)} rate ${who(tgt)} (esquive).`); return false; }
-    const a = atkParts(att);
+  function changeFury(src, t, n) {
+    if (!t.alive) return;
+    if (n > 0 && hasFlag(t, 'noFury')) { L('info', `${who(t)} ne peut pas gagner de fury.`); return; }
+    if (n < 0 && src && src.team !== t.team && t.immune.has('furyReduction')) { L('info', `${who(t)} est immunisé à la réduction de fury.`); return; }
+    t.fury = Math.max(0, t.fury + n);
+  }
+
+  // Un coup direct. Renvoie { hit, dmg }.
+  function strike(att, tgt, skillPct, mult, label, type = att.attackType, ctx) {
+    const dk = dodgeKind(att, tgt);
+    if (dk) { L('miss', `${who(tgt)} évite totalement l'attaque (${dk}).`, { attacker: att.uid }); return { hit: false, dmg: 0 }; }
+    if (!roll(F.chance(stat(att, 'hit'), stat(tgt, 'dodge')))) { L('miss', `${who(att)} rate ${who(tgt)} (esquive).`, { attacker: att.uid }); return { hit: false, dmg: 0 }; }
+    const a = atkParts(att, type);
     const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') });
-    const dEff = defEff(att, tgt, rules);
+    const dEff = defEff(att, tgt, type, rules);
     const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr')]);
     const airEff = F.effectiveRate(tgt.stats.air || 0, [modSum(tgt, 'air')]);
     // (ATK - DEF) et (Dégâts - Absorption) bornés à 0 séparément : deux termes négatifs ne doivent pas donner des dégâts positifs.
@@ -280,78 +385,152 @@ export function simulate(teamA, teamB, opts = {}) {
         reduction: modSum(tgt, 'finalReduction'),
         decreaseReduction: modSum(att, 'decreaseReduction') + modSum(tgt, 'decreaseReduction'),
       }),
-    }) * mult;
+    }) * mult * (1 + modSum(tgt, 'dmgTaken') / 100);
     const pCrit = F.chance(stat(att, 'crit'), stat(tgt, 'antiCrit'));
     const pBlock = F.chance(stat(tgt, 'block'), stat(att, 'sAtk'));
     let crit = false, block = false;
     if (rules.critFirst) { crit = roll(pCrit); if (!crit) block = roll(pBlock); }
     else { block = roll(pBlock); if (!block) crit = roll(pCrit); }
     let dmg = base;
-    if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), modSum(tgt, 'critDmgTaken'));
+    if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), -modSum(tgt, 'critDmgTaken'));
     if (block) dmg *= 1 - rules.blockReduction / 100;
-    if (hasFlag(tgt, 'ignoreDirect')) { L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`); return true; }
-    damage(tgt, dmg, att, label, { type: 'hit', extra: { attacker: att.uid, target: tgt.uid, amount: dmg, crit, block },
-      text: () => `${who(att)} → ${who(tgt)} : ${fmt(dmg)} dégâts${crit ? ' (CRITIQUE)' : ''}${block ? ' (BLOQUÉ)' : ''} → ${hpTxt(tgt)}.` });
-    return true;
+    if (hasFlag(tgt, 'ignoreDirect')) {
+      L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`, { attacker: att.uid });
+      dmg = 0;
+    } else {
+      damage(tgt, dmg, att, label, { type: 'hit', extra: { attacker: att.uid, target: tgt.uid, amount: dmg, crit, block },
+        text: () => `${who(att)} → ${who(tgt)} : ${fmt(dmg)} dégâts${type !== att.attackType ? (type === 'magic' ? ' stratégiques' : ' physiques') : ''}${crit ? ' (CRITIQUE)' : ''}${block ? ' (BLOQUÉ)' : ''} → ${hpTxt(tgt)}.` });
+      ctx.lost.set(tgt, (ctx.lost.get(tgt) || 0) + dmg);
+    }
+    const sCrit = stat(att, 'sCrit');
+    if (crit && sCrit > 0 && tgt.alive) {
+      const d = tgt.hp * sCrit / 100;
+      damage(tgt, d, att, 's.crit', { type: 'hit', extra: { attacker: att.uid, amount: d }, text: () => `S.crit : ${who(tgt)} perd ${fmt(d)} PV (${sCrit} % de ses PV actuels) → ${hpTxt(tgt)}.` });
+    }
+    const sBlock = stat(tgt, 'sBlock');
+    if (block && sBlock > 0 && att.alive && tgt.alive) {
+      const d = att.hp * sBlock / 100;
+      damage(att, d, tgt, 's.block', { type: 'hit', extra: { attacker: tgt.uid, amount: d }, text: () => `S.block : ${who(att)} perd ${fmt(d)} PV (${sBlock} % de ses PV actuels) → ${hpTxt(att)}.` });
+    }
+    return { hit: true, dmg };
   }
 
-  function runEffect(att, eff, hitTargets) {
-    const targets = eff.to === 'target' || eff.to === undefined ? hitTargets : resolve(eff.to, att, units, rng);
-    for (const t of targets) {
-      if (!t.alive) continue;
-      if (eff.chance != null && eff.chance < 100 && !roll(eff.chance / 100)) continue;
-      if (eff.heal) heal(att, t, eff.heal);
-      else if (eff.penetration) {
-        const a = atkParts(att);
-        const d = F.penetrationDamage({
-          atkEff: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
-          penPct: eff.penetration, penBonus: modSum(att, 'penBonus'),
-          penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
-        });
-        damage(t, d, att, 'pénétration', { type: 'hit', extra: { amount: d },
-          text: () => `${who(att)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
-      } else if (eff.dot) {
-        const a = atkParts(att);
-        const snap = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons });
-        addStatus(att, t, { name: eff.dot.name || 'DoT', type: 'dot', duration: eff.dot.duration ?? 2,
-          cleansable: !['Incinerate', 'Burn'].includes(eff.dot.name),
-          dot: { pct: eff.dot.pct, atk: snap, attType: att.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
-      } else if (eff.fury) {
-        t.fury = Math.max(0, t.fury + eff.fury);
-        L('effect', `${who(t)} ${eff.fury > 0 ? 'gagne' : 'perd'} ${Math.abs(eff.fury)} de fury (${fmt(t.fury)}).`);
-      } else if (eff.cleanse) {
-        const before = t.effects.length;
-        t.effects = t.effects.filter((e) => !(e.cleansable && Number.isFinite(e.remaining) && (eff.cleanse === 'all' || e.type === eff.cleanse || (eff.cleanse === 'debuff' && e.type === 'dot'))));
-        if (before !== t.effects.length) L('effect', `${who(t)} : ${before - t.effects.length} effet(s) dissipé(s).`);
-      } else if (eff.status || eff.mods) {
-        addStatus(att, t, eff);
+  // ctx : { hit: [cibles touchées], attacker: unité qui vient d'attaquer (déclencheurs), lost: Map PV perdus }
+  function runEffects(owner, effects, ctx = {}) {
+    for (const eff of effects || []) {
+      let targets;
+      if (eff.to === 'target' || eff.to === undefined) targets = ctx.hit || [];
+      else if (eff.to === 'attacker') targets = ctx.attacker ? [ctx.attacker] : [];
+      else targets = R(eff.to, owner);
+      for (const t of targets) {
+        if (!t || !t.alive) continue;
+        if (eff.status && t.immune.has(eff.status)) { L('info', `${who(t)} est immunisé à ${STATUSES[eff.status]?.name || eff.status}.`, { target: t.uid }); continue; }
+        const isCc = eff.status && STATUSES[eff.status]?.type === 'cc';
+        let p = eff.chance ?? 100;
+        if (isCc && t.team !== owner.team) p += stat(owner, 'ccRate') - stat(t, 'ccRes');
+        if (p < 100 && !roll(Math.max(0, p) / 100)) {
+          if (isCc) L('info', `${who(t)} résiste à ${STATUSES[eff.status].name}.`, { target: t.uid });
+          continue;
+        }
+        applyOne(owner, t, eff, ctx);
       }
     }
   }
 
-  // Une action : 'main' (tour normal ou tour bonus) ou 'aid' (punch).
+  function applyOne(owner, t, eff, ctx) {
+    if (eff.heal) heal(owner, t, eff.heal);
+    else if (eff.penetration) {
+      const dk = dodgeKind(owner, t);
+      if (dk) { L('miss', `${who(t)} évite la pénétration (${dk}).`); return; }
+      const a = atkParts(owner, eff.attackType || owner.attackType);
+      const d = F.penetrationDamage({
+        atkEff: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
+        penPct: eff.penetration, penBonus: modSum(owner, 'penBonus'),
+        penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
+      });
+      damage(t, d, owner, 'pénétration', { type: 'hit', extra: { attacker: owner.uid, amount: d },
+        text: () => `${who(owner)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
+    } else if (eff.dot) {
+      const a = atkParts(owner);
+      const snap = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons });
+      addStatus(owner, t, { name: eff.dot.name || 'DoT', type: 'dot', duration: eff.dot.duration ?? 2,
+        cleansable: !UNCLEANSABLE_DOTS.includes(eff.dot.name),
+        dot: { pct: eff.dot.pct, atk: snap, attType: owner.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
+    } else if (eff.fury) {
+      changeFury(owner, t, eff.fury);
+      L('effect', `${who(t)} : fury ${eff.fury > 0 ? '+' : ''}${eff.fury} (${fmt(t.fury)}).`, { target: t.uid });
+    } else if (eff.cleanse) {
+      const before = t.effects.length;
+      const kinds = eff.cleanse === 'all' ? ['buff', 'debuff', 'dot', 'cc'] : eff.cleanse === 'debuff' ? ['debuff', 'dot', 'cc'] : [eff.cleanse];
+      t.effects = t.effects.filter((e) => !(e.cleansable && Number.isFinite(e.remaining) && kinds.includes(e.type)));
+      if (before !== t.effects.length) L('effect', `${who(t)} : ${before - t.effects.length} effet(s) dissipé(s).`, { target: t.uid });
+    } else if (eff.hpLossPct) {
+      const d = t.hp * eff.hpLossPct / 100;
+      damage(t, d, owner, 'perte de PV', { type: 'dot', extra: { target: t.uid, amount: d },
+        text: () => `${who(t)} perd ${eff.hpLossPct} % de ses PV actuels (${fmt(d)}) → ${hpTxt(t)}.` });
+    } else if (eff.reflect) {
+      const lost = ctx.lost?.get(owner) || 0;
+      const pct = eff.reflect - stat(t, 'reflectRes');
+      if (lost > 0 && pct > 0) {
+        const d = lost * pct / 100;
+        damage(t, d, owner, 'renvoi', { type: 'hit', extra: { attacker: owner.uid, amount: d },
+          text: () => `Renvoi : ${who(owner)} renvoie ${fmt(d)} dégâts à ${who(t)} → ${hpTxt(t)}.` });
+      }
+    } else if (eff.status || eff.mods) {
+      addStatus(owner, t, eff);
+    }
+  }
+
+  // Une action : 'main' (tour normal ou tour bonus) ou 'aid' (aide).
   function act(u, mode) {
-    const sealed = u.effects.some((e) => e.flags?.cc === 'seal');
-    const useSpecial = mode !== 'aid' && u.ninja.special && u.fury >= rules.specialCost && !sealed;
-    const skill = useSpecial ? u.ninja.special : (u.ninja.normal || {});
-    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide (punch)' : 'une attaque normale';
+    const sealed = u.effects.find((e) => e.flags?.cc === 'seal');
+    const canSpecial = u.kit.special && u.fury >= rules.specialCost;
+    const useSpecial = mode !== 'aid' && canSpecial && !sealed;
+    const skill = useSpecial ? u.kit.special : u.kit.normal;
+    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide' : 'une attaque normale';
     L('action', `${who(u)} utilise ${name} (fury ${fmt(u.fury)}).`, { actor: u.uid, special: useSpecial });
-    if (sealed && u.fury >= rules.specialCost && u.ninja.special) L('info', `${who(u)} est sous Seal : spéciale impossible.`);
-    const targets = resolve(skill.target || 'front-row', u, units, rng);
-    const hit = [];
-    if (!skill.noDamage) {
-      const mult = mode === 'aid' ? rules.aidDamagePct / 100 : 1;
-      for (const t of targets) if (t.alive && strike(u, t, skill.skillPct ?? 100, mult, useSpecial ? 'spéciale' : 'attaque')) hit.push(t);
-    } else hit.push(...targets);
-    for (const eff of skill.effects || []) runEffect(u, eff, hit);
-    for (const pr of u.procs) if (!pr.on || pr.on === 'any' || (pr.on === 'special') === useSpecial) runEffect(u, pr, hit);
+    if (sealed && canSpecial && mode !== 'aid') L('info', `${who(u)} est sous ${sealed.name} : spéciale impossible.`, { actor: u.uid });
+    const ctx = { hit: [], attacker: u, lost: new Map() };
+    if (useSpecial) runEffects(u, skill.pre, ctx);
+    const struck = new Set();
+    const mult = mode === 'aid' ? rules.aidDamagePct / 100 : 1;
+    for (const h of skillHits(skill)) {
+      for (const t of R(h.target || 'front-row', u)) {
+        if (!t.alive || !u.alive) continue;
+        const pct = h.pctByRole?.[t.role] ?? h.pctByNature?.[t.nature] ?? h.pct ?? 100;
+        struck.add(t);
+        const r = strike(u, t, pct, mult, useSpecial ? 'spéciale' : 'attaque', h.attackType || u.attackType, ctx);
+        if (r.hit && !ctx.hit.includes(t)) ctx.hit.push(t);
+      }
+    }
+    if (skill.noDamage) ctx.hit.push(...R(skill.target || 'front-row', u));
+    if (u.alive) {
+      runEffects(u, skill.effects, ctx);
+      for (const pr of u.procs) if (!pr.on || pr.on === 'any' || (pr.on === 'special') === useSpecial) runEffects(u, [pr], ctx);
+    }
     // fury
     if (useSpecial) {
       u.fury -= rules.specialCost;
-      for (const a of units) if (a.alive && a.team === u.team) a.fury += rules.specialTeamFury;
-      L('info', `Fury : ${who(u)} dépense ${rules.specialCost}, toute la formation ${teamNames[u.team]} gagne ${rules.specialTeamFury}.`);
+      const f = skill.fury;
+      if (f) {
+        if (f.self) changeFury(u, u, f.self);
+        if (f.allies) for (const a of units) if (a.alive && a.team === u.team && a !== u) changeFury(u, a, f.allies);
+        L('info', `Fury : ${who(u)} dépense ${rules.specialCost}${f.self ? `, récupère ${f.self}` : ''}${f.allies ? `, alliés +${f.allies}` : ''}.`, { actor: u.uid });
+      } else {
+        for (const a of units) if (a.alive && a.team === u.team) changeFury(u, a, rules.specialTeamFury);
+        L('info', `Fury : ${who(u)} dépense ${rules.specialCost}, toute la formation gagne ${rules.specialTeamFury}.`, { actor: u.uid });
+      }
     } else if (mode !== 'aid' || rules.aidGivesFury) {
-      u.fury += rules.normalFury;
+      changeFury(u, u, rules.normalFury);
+    }
+    // déclencheurs « après avoir été attaqué »
+    for (const t of struck) {
+      if (!t.alive) continue;
+      for (const tr of t.triggers) {
+        if (tr.on !== 'attacked') continue;
+        if (tr.chance != null && tr.chance < 100 && !roll(tr.chance / 100)) continue;
+        runEffects(t, tr.effects, { attacker: u, lost: ctx.lost, hit: [] });
+      }
     }
   }
 
@@ -363,10 +542,10 @@ export function simulate(teamA, teamB, opts = {}) {
   }
 
   function maybeAid(u) {
-    if (!u.alive || !roll(stat(u, 'aid') / 100)) return;
+    if (!u.alive || !roll(aidChance(u) / 100)) return;
     const p = aidPartner(u);
     if (!p || p.effects.some((e) => e.flags?.cc === 'hard')) return;
-    L('aid', `👊 Punch ! ${who(u)} déclenche l'aide de ${who(p)}.`);
+    L('aid', `👊 Aide ! ${who(u)} déclenche l'action de ${who(p)}.`, { actor: u.uid });
     act(p, 'aid');
     if (rules.aidChains && !over()) maybeAid(p);
   }
@@ -376,22 +555,23 @@ export function simulate(teamA, teamB, opts = {}) {
 
   function startOfTurn(u) {
     if (hasFlag(u, 'deathSeed') && !hasFlag(u, 'deathSeedImmune')) {
-      L('effect', `Death Seed se déclenche sur ${who(u)}.`);
-      damage(u, u.hp, null, 'Death Seed');
+      u.effects = u.effects.filter((e) => !e.flags?.deathSeed);
+      L('effect', `Death Seed se déclenche sur ${who(u)}.`, { target: u.uid });
+      kill(u, null, 'Death Seed');
       return;
     }
-    for (const e of u.effects) {
+    for (const e of [...u.effects]) {
       if (!u.alive) return;
       if (e.flags?.poisonWind) {
         const d = u.hp * (e.value ?? 30) / 100;
-        damage(u, d, null, 'Poisonous Wind', { type: 'dot', extra: { amount: d },
+        damage(u, d, null, 'Poisonous Wind', { type: 'dot', extra: { target: u.uid, amount: d },
           text: () => `Poisonous Wind : ${who(u)} perd ${fmt(d)} PV → ${hpTxt(u)}.` });
       }
       if (e.dot) {
-        if (hasFlag(u, 'superDodge')) continue;
-        const dEff = defEff({ attackType: e.dot.attType, passives: [], effects: [] }, u, rules);
+        if (dodgeKind(e.source, u)) continue;
+        const dEff = defEff(null, u, e.dot.attType, rules);
         const d = F.dotDamage({ atkEff: e.dot.atk, dotPct: e.dot.pct, defEff: dEff, bloodlinePct: e.dot.bypassBloodline ? 0 : stat(u, 'bloodline') });
-        damage(u, d, e.source, e.name, { type: 'dot', extra: { amount: d },
+        damage(u, d, e.source, e.name, { type: 'dot', extra: { target: u.uid, amount: d },
           text: () => `${e.name} : ${who(u)} subit ${fmt(d)} dégâts → ${hpTxt(u)}.` });
       }
     }
@@ -405,7 +585,7 @@ export function simulate(teamA, teamB, opts = {}) {
     }
     const expired = u.effects.filter((e) => e.remaining <= 0);
     u.effects = u.effects.filter((e) => e.remaining > 0);
-    if (expired.length) L('expire', `Fin d'effet sur ${who(u)} : ${expired.map((e) => e.name).join(', ')}.`);
+    if (expired.length) L('expire', `Fin d'effet sur ${who(u)} : ${expired.map((e) => e.name).join(', ')}.`, { target: u.uid });
   }
 
   function turn(u) {
@@ -414,12 +594,12 @@ export function simulate(teamA, teamB, opts = {}) {
     startOfTurn(u);
     if (u.alive && !over()) {
       const hard = u.effects.find((e) => e.flags?.cc === 'hard');
-      if (hard) L('info', `${who(u)} est sous ${hard.name} et ne peut pas agir.`);
+      if (hard) L('info', `${who(u)} est sous ${hard.name} et ne peut pas agir.`, { actor: u.uid });
       else {
         act(u, 'main');
         if (!over()) maybeAid(u);
-        if (!over() && u.alive && roll(stat(u, 'extraTurn') / 100)) {
-          L('extra', `⚡ Tour bonus pour ${who(u)} !`);
+        if (!over() && u.alive && roll(extraTurnChance(u) / 100)) {
+          L('extra', `⚡ Tour bonus pour ${who(u)} !`, { actor: u.uid });
           act(u, 'main');
           if (!over()) maybeAid(u);
         }

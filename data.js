@@ -1,6 +1,6 @@
 // Base de données : ninjas, compétences et équipements.
-// Les ninjas ci-dessous sont des EXEMPLES fictifs pour tester le moteur ; ils seront remplacés
-// par les vrais ninjas du jeu au fur et à mesure.
+// Les avant-gardes sont les vrais ninjas du jeu (dossier ninjas/). Les attaquants et supports « Exemple »
+// sont fictifs et seront remplacés au fur et à mesure.
 //
 // Format d'un ninja :
 //   role        : 'vanguard' | 'assaulter' | 'supporter'
@@ -15,27 +15,15 @@
 //   | { dot: { name, pct, duration } } | { fury: ±n } | { cleanse: 'debuff'|'buff'|'all' }
 //   | { mods: [...], type: 'buff'|'debuff', name, duration }
 
+import { VANGUARDS } from './ninjas/vanguards.js';
+
 export const NINJAS = [
+  ...VANGUARDS,
   {
     id: 'main', name: 'Personnage principal', role: 'assaulter', isMain: true,
     talents: [],
     normal: { skillPct: 100 },
     special: { name: 'Spéciale du personnage', skillPct: 220, target: 'front-row', effects: [] },
-  },
-  {
-    id: 'ex-vanguard', name: 'Exemple Avant-garde', role: 'vanguard', tags: ['terre'],
-    talents: [
-      { to: 'self', mods: [{ stat: 'def', value: 30 }] },
-      { to: 'allies', mods: [{ stat: 'air', value: 20 }] },
-    ],
-    normal: { skillPct: 100 },
-    special: {
-      name: 'Mur de pierre', skillPct: 150, target: 'front-row',
-      effects: [
-        { to: 'allies', status: 'superDefense', duration: 2 },
-        { to: 'self', status: 'bond', duration: 2, chance: 50 },
-      ],
-    },
   },
   {
     id: 'ex-assaulter', name: 'Exemple Attaquant', role: 'assaulter', tags: ['feu'],
@@ -99,7 +87,7 @@ export const NINJAS = [
 export const EQUIPMENT = [
   { id: 'ex-ring-speed', name: 'Bague de vitesse (exemple)', passives: [{ to: 'allies', mods: [{ stat: 'speed', value: 116 }] }] },
   { id: 'ex-pain-gear', name: 'Équipement Pain (exemple)', passives: [{ to: 'self', mods: [{ stat: 'immuneIgnoreDef', value: 20 }] }] },
-  { id: 'ex-guren-acc', name: 'Accessoire Guren (exemple)', procs: [{ on: 'any', to: { side: 'ally', pick: 'all', tag: 'eau' }, status: 'bond', duration: 1, chance: 50 }] },
+  { id: 'ex-guren-acc', name: 'Accessoire Guren (exemple)', procs: [{ on: 'any', to: { side: 'ally', pick: 'all', nature: 'water' }, status: 'bond', duration: 1, chance: 50 }] },
 ];
 
 // Statistiques d'exemple (reprises de la capture d'écran du jeu).

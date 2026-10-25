@@ -1,8 +1,8 @@
-import { simulate, simulateMany, validateTeam, DEFAULT_RULES, ROLE_LABEL } from './engine.js';
+import { simulate, simulateMany, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
 import { NINJAS, EQUIPMENT, SAMPLE_STATS } from './data.js';
-import { STATUSES } from './statuses.js';
+import * as D from './describe.js';
 
-const STORE_KEY = 'myninja-sim-v1';
+const STORE_KEY = 'myninja-sim-v2';
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 const eqById = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
 const ROWS = [
@@ -28,6 +28,9 @@ const RULE_FIELDS = [
   ['aidChains', 'Un ninja aidé peut à son tour donner un punch', 'bool'],
   ['maxRounds', 'Limite de rounds (puis victoire aux PV restants)', 'number'],
   ['defenseMode', 'Formule de défense', 'select', [['corrected', 'Corrigée'], ['excel', 'Identique à l\'Excel']]],
+  ['applyBaseLine', 'Ajouter la ligne de base du talent (vitesse, Dégâts, Absorption propres) aux stats saisies', 'bool'],
+  ['punchIsExtraTurn', '« Punch rate » des descriptions = Tour Bonus (sinon = Aide)', 'bool'],
+  ['roleFallback', 'Attaque sur un poste vide : viser la première ligne', 'bool'],
 ];
 
 // ---------- État ----------
@@ -37,18 +40,18 @@ function demoState() {
   return {
     teams: [
       { name: 'Ma formation', slots: {
-        V0: { ninjaId: 'ex-vanguard', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }), equipment: ['ex-pain-gear'] },
-        A0: { ninjaId: 'main', stats: demoStats(), equipment: [], attackType: 'physical' },
-        A1: { ninjaId: 'ex-assassin', stats: demoStats({ speed: 15e6 }), equipment: ['ex-ring-speed'] },
-        S0: { ninjaId: 'ex-healer', stats: demoStats({ hp: 55e6 }), equipment: [] },
-        S1: { ninjaId: 'ex-controller', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        V0: { ninjaId: 'hidan-kakuzu', nature: 'water', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }), equipment: ['ex-pain-gear'] },
+        A0: { ninjaId: 'main', nature: 'fire', stats: demoStats(), equipment: [], attackType: 'physical' },
+        A1: { ninjaId: 'ex-assassin', nature: 'wind', stats: demoStats({ speed: 15e6 }), equipment: [] },
+        S0: { ninjaId: 'ex-healer', nature: 'water', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        S1: { ninjaId: 'ex-controller', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
       } },
       { name: 'Adversaire', slots: {
-        V0: { ninjaId: 'ex-vanguard', stats: demoStats({ hp: 95e6, pdef: 15e6, mdef: 12e6 }), equipment: [] },
-        A0: { ninjaId: 'ex-assaulter', stats: demoStats({ patk: 48e6 }), equipment: [] },
-        A1: { ninjaId: 'ex-assassin', stats: demoStats({ speed: 14.6e6 }), equipment: ['ex-ring-speed'] },
-        S0: { ninjaId: 'ex-healer', stats: demoStats({ hp: 55e6 }), equipment: ['ex-guren-acc'] },
-        S1: { ninjaId: 'ex-controller', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        V0: { ninjaId: 'hinata-soccer', nature: 'earth', stats: demoStats({ hp: 95e6, pdef: 15e6, mdef: 12e6 }), equipment: [] },
+        A0: { ninjaId: 'ex-assaulter', nature: 'fire', stats: demoStats({ patk: 48e6 }), equipment: [] },
+        A1: { ninjaId: 'ex-assassin', nature: 'wind', stats: demoStats({ speed: 14.6e6 }), equipment: [] },
+        S0: { ninjaId: 'ex-healer', nature: 'water', stats: demoStats({ hp: 55e6 }), equipment: ['ex-guren-acc'] },
+        S1: { ninjaId: 'ex-controller', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
       } },
     ],
     rules: { ...DEFAULT_RULES },
@@ -92,6 +95,7 @@ function toTeam(t) {
     members.push({
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
+      nature: m.nature || 'none', awakening: m.awakening,
       equipment: (m.equipment || []).map((id) => eqById[id]).filter(Boolean),
     });
   }
@@ -119,7 +123,7 @@ function renderTeam(ti) {
       const btn = el('button', { class: `slot${n ? ' filled' : ''}`, type: 'button', id: `slot-${ti}-${key}`,
         'aria-label': n ? `Modifier ${n.name}` : `Ajouter un ninja (${row.label})`, onclick: () => openEditor(ti, key) },
       n ? [el('span', { class: 'nm' }, m.label || n.name),
-        el('span', { class: 'st' }, `PV ${short(m.stats.hp || 0)} · Vit ${short(m.stats.speed || 0)}`)]
+        el('span', { class: 'st' }, `${NATURES[m.nature || 'none']} · PV ${short(m.stats.hp || 0)}`)]
         : el('span', { class: 'empty' }, '+ Ajouter'));
       col.append(btn);
     }
@@ -132,37 +136,16 @@ function renderTeam(ti) {
 
 // ---------- Fiche d'un ninja ----------
 
-const TARGET_LABEL = (t) => {
-  if (!t || t === 'front-row') return 'la première ligne ennemie';
-  if (typeof t === 'string') return { self: 'lui-même', allies: 'tous les alliés', enemies: 'tous les ennemis' }[t] || t;
-  const side = t.side === 'ally' ? 'allié' : 'ennemi';
-  const picks = { all: `tous les ${side}s`, 'lowest-hp': `l'${side} avec le moins de PV`, 'lowest-hp-pct': `l'${side} avec le plus faible % de PV`,
-    'highest-hp': `l'${side} avec le plus de PV`, 'highest-atk': `l'${side} avec la plus forte attaque`, 'highest-speed': `l'${side} le plus rapide`,
-    random: `${t.count || 1} ${side}(s) au hasard`, 'front-row': 'la première ligne', 'back-row': 'la dernière ligne' };
-  let s = picks[t.pick || 'all'] || t.pick;
-  if (t.role) s += ` (${ROLE_LABEL[t.role]})`;
-  if (t.tag) s += ` [${t.tag}]`;
-  return s;
-};
-function describeEffect(e) {
-  const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
-  const to = e.to === 'target' || !e.to ? 'la cible' : TARGET_LABEL(e.to);
-  if (e.heal) return `${ch}soigne ${to} (${e.heal} %)`;
-  if (e.penetration) return `${ch}pénétration ${e.penetration} % sur ${to}`;
-  if (e.dot) return `${ch}${e.dot.name} ${e.dot.pct} % sur ${to} (${e.dot.duration} tours)`;
-  if (e.fury) return `${ch}${e.fury > 0 ? '+' : ''}${e.fury} fury à ${to}`;
-  if (e.cleanse) return `${ch}dissipe les ${e.cleanse}s de ${to}`;
-  const st = STATUSES[e.status];
-  return `${ch}${st ? st.name : e.name || 'effet'} sur ${to}${e.duration ? ` (${e.duration} tours)` : ''}`;
-}
-function describeNinja(n) {
-  const parts = [];
-  if (n.talents?.length) parts.push(`Talents : ${n.talents.map((t) => (t.mods || []).map((m) => `${m.stat} ${m.value > 0 ? '+' : ''}${m.value} %`).join(', ') + ` → ${TARGET_LABEL(t.to || 'self')}`).join(' ; ')}.`);
-  if (n.special) {
-    const s = n.special;
-    parts.push(`Spéciale « ${s.name} » : ${s.noDamage ? 'sans dégâts' : `${s.skillPct} %`} sur ${TARGET_LABEL(s.target)}${s.effects?.length ? ', ' + s.effects.map(describeEffect).join(', ') : ''}.`);
-  }
-  return parts.join(' ');
+function kitView(n, level) {
+  const kit = resolveKit(n, level);
+  const section = (title, items) => (items.length ? el('div', { class: 'kit-sec' }, el('div', { class: 'col-label' }, title), el('ul', {}, items.map((t) => el('li', {}, t)))) : null);
+  const aw = (n.awakenings || []).map((a, i) => `${i < kit.level ? '✔' : '✘'} ${a.name}${a.replacePrevious ? ' (remplace l\'éveil précédent)' : ''}`);
+  return el('div', { class: 'kit' },
+    n.base ? el('div', { class: 'note' }, `Ligne de base : vitesse ${n.base.speed ?? 0} %, Dégâts ${n.base.dr ?? 0} %, Absorption ${n.base.air ?? 0} % (considérée comme déjà incluse dans les stats saisies).`) : null,
+    section('Talents actifs', kit.talents.map(D.talent).filter(Boolean)),
+    section('Éveils', aw),
+    kit.normal?.effects?.length || kit.normal?.hits ? section('Attaque normale', D.skill(kit.normal)) : null,
+    section(`Spéciale${kit.special?.name ? ` · ${kit.special.name}` : ''}`, D.skill(kit.special)));
 }
 
 function openEditor(ti, key) {
@@ -174,7 +157,7 @@ function openEditor(ti, key) {
   const options = NINJAS.filter((n) => n.role === row.role);
   const render = () => {
     const n = byId[draft.ninjaId];
-    form.replaceChildren(
+    form.replaceChildren(...[
       el('div', { class: 'dlg-head' },
         el('h2', {}, `${t.name} · ${row.label}`),
         el('button', { class: 'btn small', value: 'cancel', type: 'submit' }, 'Fermer')),
@@ -182,7 +165,14 @@ function openEditor(ti, key) {
         el('select', { id: 'f-ninja', onchange: (e) => { draft.ninjaId = e.target.value; render(); } },
           el('option', { value: '' }, '— choisir —'),
           options.map((o) => el('option', { value: o.id, selected: o.id === draft.ninjaId }, o.name)))),
-      n ? el('div', { class: 'skill-desc' }, describeNinja(n) || 'Pas encore de compétence enregistrée.') : null,
+      n ? el('div', { class: 'two' },
+        el('label', { class: 'field', for: 'f-nature' }, 'Nature de chakra',
+          el('select', { id: 'f-nature', onchange: (e) => { draft.nature = e.target.value; } },
+            Object.entries(NATURES).map(([k, v]) => el('option', { value: k, selected: (draft.nature || 'none') === k }, v)))),
+        n.awakenings?.length ? el('label', { class: 'field', for: 'f-aw' }, 'Niveau d\'éveil',
+          el('select', { id: 'f-aw', onchange: (e) => { draft.awakening = Number(e.target.value); render(); } },
+            Array.from({ length: n.awakenings.length + 1 }, (_, i) => el('option', { value: i, selected: (draft.awakening ?? n.awakenings.length) === i }, i === 0 ? 'Aucun' : `${i} · ${n.awakenings[i - 1].name}`)))) : null) : null,
+      n ? el('details', { class: 'skill-desc' }, el('summary', {}, 'Talents et compétences (vérifier la transcription)'), kitView(n, draft.awakening)) : null,
       n?.isMain ? el('label', { class: 'field', for: 'f-type' }, 'Type d\'attaque',
         el('select', { id: 'f-type', onchange: (e) => { draft.attackType = e.target.value; } },
           el('option', { value: 'physical', selected: draft.attackType !== 'magic' }, 'Physique'),
@@ -204,7 +194,7 @@ function openEditor(ti, key) {
           if (byId[draft.ninjaId].isMain && !draft.attackType) draft.attackType = 'physical';
           t.slots[key] = draft; done();
         } }, 'Enregistrer')),
-    );
+    ].filter(Boolean));
   };
   const done = () => { save(); renderTeam(ti); $('#dlg').close(); };
   render();
