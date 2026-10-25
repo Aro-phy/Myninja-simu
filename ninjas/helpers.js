@@ -27,3 +27,36 @@ const STAT_FR = {
 export function describeMods(mods) {
   return mods.map((x) => `${STAT_FR[x.stat] || x.stat} ${x.value > 0 ? '+' : ''}${x.value} %`).join(', ');
 }
+
+// Talents d'équipe importés du classeur (bonus alliés / malus ennemis, bonus par nature, immunités).
+import { SHEET } from './sheet-auras.js';
+export function fromSheet(id) {
+  const s = SHEET[id];
+  if (!s) throw new Error(`Ninja absent du classeur : ${id}`);
+  const out = [];
+  const mk = (obj) => Object.entries(obj).map(([k, v]) => m(k, v));
+  if (s.auras.ally) out.push({ to: ALLIES, mods: mk(s.auras.ally) });
+  if (s.auras.enemy) out.push({ to: ENEMIES, mods: mk(s.auras.enemy) });
+  if (s.auras.allySupport) out.push({ to: role('ally', 'supporter'), mods: mk(s.auras.allySupport) });
+  out.push(...natureTalents(s.natures));
+  if (s.immune.length) out.push({ to: SELF, immune: s.immune });
+  return out;
+}
+// Bonus selon la nature : pour les alliés de cette nature (« enemy: » = ennemis de cette nature, « support: » = supports de cette nature).
+export function natureTalents(natures) {
+  const out = [];
+  for (const [nat, obj] of Object.entries(natures)) {
+    const groups = { ally: [], enemy: [], support: [] };
+    for (const [k, v] of Object.entries(obj)) {
+      const [g, stat] = k.includes(':') ? k.split(':') : ['ally', k];
+      groups[g].push(m(stat, v));
+    }
+    if (groups.ally.length) out.push({ to: nature('ally', nat), mods: groups.ally });
+    if (groups.enemy.length) out.push({ to: nature('enemy', nat), mods: groups.enemy });
+    if (groups.support.length) out.push({ to: { side: 'ally', pick: 'all', role: 'supporter', nature: nat }, mods: groups.support });
+  }
+  return out;
+}
+export const SHEET_DATA = SHEET;
+export const named = (side, ...names) => ({ side, pick: 'all', name: names });
+export const gendered = (side, gender) => ({ side, pick: 'all', gender });

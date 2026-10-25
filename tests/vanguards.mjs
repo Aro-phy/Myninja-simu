@@ -5,10 +5,10 @@ const vg = NINJAS.filter((n) => n.role === 'vanguard');
 const ex = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 const team = (v, name) => ({ name, members: [
   { ninja: v, pos: 0, stats: { ...SAMPLE_STATS, hp: 120e6, air: 460 }, nature: 'water' },
-  { ninja: ex['ex-assaulter'], pos: 0, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'fire' },
-  { ninja: ex['ex-assassin'], pos: 1, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'wind' },
-  { ninja: ex['ex-healer'], pos: 0, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'earth' },
-  { ninja: ex['ex-controller'], pos: 1, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'thunder' },
+  { ninja: ex['sasuke-taka'], pos: 0, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'fire' },
+  { ninja: ex['kawaki'], pos: 1, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'wind' },
+  { ninja: ex['uchiha-sarada'], pos: 0, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'earth' },
+  { ninja: ex['xmas-temari'], pos: 1, stats: { ...SAMPLE_STATS, air: 460 }, nature: 'thunder' },
 ] });
 let n = 0, errors = 0;
 const wins = Object.fromEntries(vg.map((v) => [v.id, 0]));

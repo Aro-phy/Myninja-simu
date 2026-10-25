@@ -64,7 +64,9 @@ export const STATUSES = {
   imprison: hard('Imprison'),
   freeze: hard('Freeze'),
   windBound: hard('Wind Bound'),
-  charm: hard('Charm'),
+  // Charme : effet du Chaos (s'attaque lui-même) ; sa puissance (Dégâts et dégâts finaux) dépend du ninja qui le pose.
+  charm: { name: 'Charm', type: 'cc', cleansable: false, value: 0, flags: { cc: 'hard', chaos: true },
+    mods: (v) => (v ? [{ stat: 'dr', value: v }, { stat: 'finalDmg', value: v }] : []) },
   seal: { name: 'Seal', type: 'cc', cleansable: false, flags: { cc: 'seal' } }, // bloque seulement la spéciale
   chaos: other('Chaos', { chaos: true }), // en plus, à son tour, le ninja fait une attaque normale contre lui-même
   stun: other('Stun'),
@@ -76,6 +78,11 @@ export const STATUSES = {
   disable: other('Disable'),
   silence: other('Silence'),
   forbidFury: other('Forbid fury'),
+  void: other('Vide'),
+  collapse: other('Effondrement'),
+  // Emprisonnement des âmes (Hyakki Sasori, posé sur ses alliés) : pas de gain de fury, +15 % contrôle et résistance.
+  soulPrison: { name: 'Emprisonnement des âmes', type: 'buff', cleansable: false, value: 15, flags: { noFury: true },
+    mods: (v) => [{ stat: 'ccRate', value: v }, { stat: 'ccRes', value: v }] },
 
   // --- Buff / debuff générique : modificateurs libres ---
   customBuff: { name: 'Buff', type: 'buff', cleansable: true },

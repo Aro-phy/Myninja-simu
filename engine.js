@@ -56,8 +56,8 @@ export function mulberry32(seed) {
 }
 
 const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
-const fmt = (n) => nf.format(Math.round(n));
-const fmtPct = (n) => `${(Math.round(n * 10) / 10).toLocaleString('fr-FR')} %`;
+const fmtNum = (n) => nf.format(Math.round(n));
+const fmtPctNum = (n) => `${(Math.round(n * 10) / 10).toLocaleString('fr-FR')} %`;
 
 export function validateTeam(team) {
   const errors = [];
@@ -95,8 +95,13 @@ export function resolveKit(ninja, level) {
   return { talents: [...(ninja.talents || []), ...awTalents], special, normal: ninja.normal || {}, base, level: lvl };
 }
 
-function skillHits(skill) {
+function skillHits(skill, rng) {
   if (skill.noDamage) return [];
+  if (skill.hitChoices && rng) {
+    let r = rng() * skill.hitChoices.reduce((a, c) => a + (c.chance ?? 1), 0);
+    for (const c of skill.hitChoices) { r -= c.chance ?? 1; if (r <= 0) return c.hits; }
+    return skill.hitChoices[skill.hitChoices.length - 1].hits;
+  }
   if (skill.hits) return skill.hits;
   return [{ target: skill.target || 'front-row', pct: skill.skillPct ?? 100 }];
 }
@@ -116,6 +121,8 @@ function makeUnit(member, team, index) {
     nature: member.nature || n.nature || 'none',
     natureLevel: member.natureLevel || 1,
     tags: n.tags || [],
+    gender: n.gender,
+    isMain: !!n.isMain,
     attackType: member.attackType || n.attackType || (n.role === 'supporter' ? 'magic' : 'physical'),
     row: ROWS[n.role],
     pos: member.pos ?? 0,
@@ -125,7 +132,7 @@ function makeUnit(member, team, index) {
     fury: member.stats.fury ?? 100,
     alive: true,
     effects: [],
-    passives: [],   // modificateurs permanents : { stat, value, kind, source, scaleSrc?, per? }
+    passives: {},   // modificateurs permanents par stat : { stat: [{ value, kind, source, scaleSrc?, per? }] }
     immune: new Set(),
     triggers: [],   // { on, chance, effects, once, used }
     procs: [],      // effets d'équipement déclenchés à chaque attaque
@@ -139,15 +146,22 @@ const lostPct = (u) => Math.max(0, 100 * (1 - u.hp / u.maxHp));
 
 function allMods(u, stat) {
   const out = [];
-  for (const p of u.passives) {
-    if (p.stat !== stat) continue;
+  for (const p of u.passives[stat] || []) {
     const v = p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
     if (v) out.push({ value: v, kind: p.kind || 'talent' });
   }
   for (const e of u.effects) for (const m of e.mods || []) if (m.stat === stat) out.push({ value: m.value, kind: m.kind || 'icon' });
   return out;
 }
-const modSum = (u, stat) => allMods(u, stat).reduce((a, m) => a + m.value, 0);
+function addPassive(u, p) { (u.passives[p.stat] ||= []).push(p); }
+// Somme des modificateurs d'une stat (version sans allocation : appelée très souvent).
+function modSum(u, stat) {
+  let sum = 0;
+  const ps = u.passives[stat];
+  if (ps) for (const p of ps) sum += p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
+  for (const e of u.effects) for (const m of e.mods) if (m.stat === stat) sum += m.value;
+  return sum;
+}
 const hasFlag = (u, flag) => u.effects.some((e) => e.flags && e.flags[flag]);
 const stat = (u, s) => (u.stats[s] || 0) + modSum(u, s);
 
@@ -164,7 +178,8 @@ function atkParts(u, type = u.attackType) {
 
 function defEff(att, tgt, type, rules) {
   const key = type === 'magic' ? 'mdef' : 'pdef';
-  const mods = [...allMods(tgt, 'def'), ...allMods(tgt, key)];
+  const cutRes = 1 - Math.min(100, modSum(tgt, 'defCutRes')) / 100; // résistance à la réduction de défense
+  const mods = [...allMods(tgt, 'def'), ...allMods(tgt, key)].map((m) => (m.value < 0 ? { ...m, value: m.value * cutRes } : m));
   return F.effectiveDefense({
     def: tgt.stats[key] || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
@@ -173,6 +188,18 @@ function defEff(att, tgt, type, rules) {
     immuneIgnoreDef: modSum(tgt, 'immuneIgnoreDef'),
     mode: rules.defenseMode,
   });
+}
+
+// Bouclier de défense : un % de la défense (talents compris) retiré des dégâts directs et des DoT.
+function shieldAmount(att, tgt) {
+  const pierce = 1 - Math.min(100, att ? modSum(att, 'shieldPierce') : 0) / 100;
+  const part = (key, stat) => {
+    const pct = modSum(tgt, stat);
+    if (pct <= 0) return 0;
+    const talents = [...allMods(tgt, 'def'), ...allMods(tgt, key)].filter((m) => m.kind === 'talent').map((m) => m.value);
+    return F.effectiveAttack({ atk: tgt.stats[key] || 0, talents, icons: 0 }) * pct / 100;
+  };
+  return (part('pdef', 'pdefShield') + part('mdef', 'mdefShield')) * pierce;
 }
 
 export function currentSpeed(u) {
@@ -203,6 +230,9 @@ function resolve(sel, caster, units, rng, rules) {
   if (roles) pool = pool.filter((u) => roles.includes(u.role));
   if (natures) pool = pool.filter((u) => natures.includes(u.nature));
   if (sel.tag) pool = pool.filter((u) => u.tags.includes(sel.tag));
+  if (sel.gender) pool = pool.filter((u) => u.gender === sel.gender);
+  if (sel.main) pool = pool.filter((u) => u.isMain);
+  if (sel.name) { const names = asList(sel.name); pool = pool.filter((u) => names.some((n) => u.ninja.name.toLowerCase().includes(n))); }
   if (!pool.length && roles && sel.fallback !== false && rules?.roleFallback && sel.side !== 'ally') {
     return resolve({ side: sel.side, pick: 'front-row' }, caster, units, rng, rules);
   }
@@ -225,6 +255,9 @@ function resolve(sel, caster, units, rng, rules) {
     case 'highest-speed': return sortBy((u) => currentSpeed(u), -1);
     case 'highest-air': return sortBy((u) => stat(u, 'air'), -1);
     case 'highest-ccres': return sortBy((u) => stat(u, 'ccRes'), -1);
+    case 'lowest-ccres': return sortBy((u) => stat(u, 'ccRes'), 1);
+    case 'highest-dr': return sortBy((u) => stat(u, 'dr'), -1);
+    case 'lowest-speed': return sortBy((u) => currentSpeed(u), 1);
     case 'random': {
       const p = [...pool], out = [];
       while (p.length && out.length < count) out.push(p.splice(Math.floor(rng() * p.length), 1)[0]);
@@ -240,6 +273,9 @@ export function simulate(teamA, teamB, opts = {}) {
   const rules = { ...DEFAULT_RULES, ...(opts.rules || {}) };
   const rng = mulberry32(opts.seed ?? Math.floor(Math.random() * 2 ** 31));
   const logOn = opts.log !== false;
+  // Sans journal (simulation de masse), on évite de mettre en forme des textes inutiles.
+  const fmt = logOn ? fmtNum : () => '';
+  const fmtPct = logOn ? fmtPctNum : () => '';
   const log = [];
   const units = [
     ...teamA.members.map((m, i) => makeUnit(m, 0, i)),
@@ -264,7 +300,7 @@ export function simulate(teamA, teamB, opts = {}) {
     for (const t of targets) {
       for (const m of p.mods || []) {
         if (selfOnly && rules.selfStatsInPanel && PANEL_STATS.has(m.stat)) continue;
-        t.passives.push({ ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}) });
+        addPassive(t, { ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}) });
       }
       for (const im of p.immune || []) t.immune.add(im);
       if (p.status) addStatus(owner, t, { status: p.status, value: p.value, duration: Infinity }, true);
@@ -273,7 +309,7 @@ export function simulate(teamA, teamB, opts = {}) {
   for (const u of units) {
     const b = u.kit.base;
     if (rules.applyBaseLine && b) {
-      for (const [k, v] of Object.entries(b)) if (typeof v === 'number') u.passives.push({ stat: k, value: v, kind: 'talent', source: 'base' });
+      for (const [k, v] of Object.entries(b)) if (typeof v === 'number') addPassive(u, { stat: k, value: v, kind: 'talent', source: 'base' });
     }
     for (const p of u.kit.talents) applyEntry(u, p, `talent ${u.ninja.name}`);
     for (const eq of u.equipment) {
@@ -285,8 +321,8 @@ export function simulate(teamA, teamB, opts = {}) {
   for (const u of units) {
     if (u.nature === 'none') continue;
     if (units.some((a) => a.team === u.team && a !== u && BOOSTS[a.nature] === u.nature)) {
-      u.passives.push({ stat: 'hp', value: NATURE_BOOST.hp, kind: 'talent', source: 'nature' },
-        { stat: 'atk', value: NATURE_BOOST.atk, kind: 'talent', source: 'nature' });
+      addPassive(u, { stat: 'hp', value: NATURE_BOOST.hp, kind: 'talent', source: 'nature' });
+      addPassive(u, { stat: 'atk', value: NATURE_BOOST.atk, kind: 'talent', source: 'nature' });
     }
   }
   for (const u of units) {
@@ -348,7 +384,8 @@ export function simulate(teamA, teamB, opts = {}) {
   }
 
   function kill(u, src, kind) {
-    const rev = u.triggers.find((t) => t.on === 'death' && !(t.once !== false && t.used));
+    const deathFx = u.triggers.filter((t) => t.on === 'death' && !t.effects.some((e) => e.revive));
+    const rev = u.triggers.find((t) => t.on === 'death' && t.effects.some((e) => e.revive) && !(t.once !== false && t.used));
     if (rev) {
       rev.used = true;
       const pct = rev.effects.find((e) => e.revive)?.revive ?? 50;
@@ -361,6 +398,10 @@ export function simulate(teamA, teamB, opts = {}) {
     u.hp = 0;
     u.alive = false;
     L('death', `💀 ${who(u)} est mis K.O.${src ? ` par ${who(src)}` : ''} (${kind}).`, { target: u.uid });
+    for (const t of deathFx) {
+      if (t.chance != null && t.chance < 100 && !roll(t.chance / 100)) continue;
+      runEffects(u, t.effects, { attacker: src, ownerDead: true });
+    }
   }
 
   // msg : texte du coup, journalisé avant l'éventuel K.O.
@@ -433,6 +474,7 @@ export function simulate(teamA, teamB, opts = {}) {
     let dmg = base;
     if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), -modSum(tgt, 'critDmgTaken'));
     if (block) dmg *= 1 - rules.blockReduction / 100;
+    if (dmg > 0) dmg = Math.max(0, dmg - shieldAmount(att, tgt));
     if (hasFlag(tgt, 'ignoreDirect')) {
       L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`, { attacker: att.uid });
       dmg = 0;
@@ -446,7 +488,7 @@ export function simulate(teamA, teamB, opts = {}) {
       const d = tgt.hp * sCrit / 100;
       damage(tgt, d, att, 's.crit', { type: 'hit', extra: { attacker: att.uid, amount: d }, text: () => `S.crit : ${who(tgt)} perd ${fmt(d)} PV (${sCrit} % de ses PV actuels) → ${hpTxt(tgt)}.` });
     }
-    const sBlock = stat(tgt, 'sBlock');
+    const sBlock = stat(tgt, 'sBlock') - modSum(att, 'sBlockRes');
     if (block && sBlock > 0 && att.alive && tgt.alive) {
       const d = att.hp * sBlock / 100;
       damage(att, d, tgt, 's.block', { type: 'hit', extra: { attacker: tgt.uid, amount: d }, text: () => `S.block : ${who(att)} perd ${fmt(d)} PV (${sBlock} % de ses PV actuels) → ${hpTxt(att)}.` });
@@ -463,6 +505,7 @@ export function simulate(teamA, teamB, opts = {}) {
       else targets = R(eff.to, owner);
       for (const t of targets) {
         if (!t || !t.alive) continue;
+        if (!owner.alive && !ctx.ownerDead) continue;
         if (eff.status && t.immune.has(eff.status)) { L('info', `${who(t)} est immunisé à ${STATUSES[eff.status]?.name || eff.status}.`, { target: t.uid }); continue; }
         const isCc = eff.status && STATUSES[eff.status]?.type === 'cc';
         let p = eff.chance ?? 100;
@@ -477,7 +520,8 @@ export function simulate(teamA, teamB, opts = {}) {
   }
 
   function applyOne(owner, t, eff, ctx) {
-    if (eff.heal) heal(owner, t, eff.heal);
+    if (eff.hot) addStatus(owner, t, { name: `Soin continu ${eff.hot} %`, type: 'buff', duration: eff.duration ?? 2, cleansable: true, flags: { hot: eff.hot } });
+    else if (eff.heal) heal(owner, t, eff.heal);
     else if (eff.penetration) {
       const dk = dodgeKind(owner, t);
       if (dk) { L('miss', `${who(t)} évite la pénétration (${dk}).`); return; }
@@ -490,11 +534,12 @@ export function simulate(teamA, teamB, opts = {}) {
       damage(t, d, owner, 'pénétration', { type: 'hit', extra: { attacker: owner.uid, amount: d },
         text: () => `${who(owner)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
     } else if (eff.dot) {
+      if (eff.dot.name === 'Sticky acid' && t.immune.has('stickyAcid')) { L('info', `${who(t)} est immunisé à Sticky acid.`); return; }
       const a = atkParts(owner);
       const snap = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons });
       addStatus(owner, t, { name: eff.dot.name || 'DoT', type: 'dot', duration: eff.dot.duration ?? 2,
         cleansable: !UNCLEANSABLE_DOTS.includes(eff.dot.name),
-        dot: { pct: eff.dot.pct, atk: snap, attType: owner.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
+        dot: { pct: eff.dot.pct, atk: snap * (1 + modSum(owner, 'dotBonus') / 100), attType: owner.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
     } else if (eff.fury) {
       changeFury(owner, t, eff.fury);
       L('effect', `${who(t)} : fury ${eff.fury > 0 ? '+' : ''}${eff.fury} (${fmt(t.fury)}).`, { target: t.uid });
@@ -534,7 +579,7 @@ export function simulate(teamA, teamB, opts = {}) {
     if (useSpecial) runEffects(u, skill.pre, ctx);
     const struck = new Set();
     const mult = mode === 'aid' ? rules.aidDamagePct / 100 : 1;
-    for (const h of skillHits(skill)) {
+    for (const h of skillHits(skill, rng)) {
       for (const t of R(h.target || 'front-row', u)) {
         if (!t.alive || !u.alive) continue;
         const pct = h.pctByRole?.[t.role] ?? h.pctByNature?.[t.nature] ?? h.pct ?? 100;
@@ -566,6 +611,11 @@ export function simulate(teamA, teamB, opts = {}) {
       }
     } else if (mode !== 'aid' || rules.aidGivesFury) {
       if (f) restore(); else changeFury(u, u, rules.normalFury);
+    }
+    // déclencheurs « après avoir attaqué »
+    if (u.alive) for (const tr of u.triggers) {
+      if (tr.on !== 'acted' || (tr.chance != null && tr.chance < 100 && !roll(tr.chance / 100))) continue;
+      runEffects(u, tr.effects, { attacker: u, lost: ctx.lost, hit: ctx.hit });
     }
     // déclencheurs « après avoir été attaqué »
     for (const t of struck) {
@@ -606,6 +656,7 @@ export function simulate(teamA, teamB, opts = {}) {
     }
     for (const e of [...u.effects]) {
       if (!u.alive) return;
+      if (e.flags?.hot && e.source?.alive) heal(e.source, u, e.flags.hot);
       if (e.flags?.poisonWind) {
         const d = u.hp * (e.value ?? 30) / 100;
         damage(u, d, null, 'Poisonous Wind', { type: 'dot', extra: { target: u.uid, amount: d },
@@ -614,7 +665,8 @@ export function simulate(teamA, teamB, opts = {}) {
       if (e.dot) {
         if (dodgeKind(e.source, u)) continue;
         const dEff = defEff(null, u, e.dot.attType, rules);
-        const d = F.dotDamage({ atkEff: e.dot.atk, dotPct: e.dot.pct, defEff: dEff, bloodlinePct: e.dot.bypassBloodline ? 0 : stat(u, 'bloodline') });
+        const raw = F.dotDamage({ atkEff: e.dot.atk, dotPct: e.dot.pct, defEff: dEff, bloodlinePct: e.dot.bypassBloodline ? 0 : stat(u, 'bloodline') });
+        const d = e.dot.bypassBloodline ? raw : Math.max(0, raw - shieldAmount(e.source, u));
         damage(u, d, e.source, e.name, { type: 'dot', extra: { target: u.uid, amount: d },
           text: () => `${e.name} : ${who(u)} subit ${fmt(d)} dégâts → ${hpTxt(u)}.` });
       }

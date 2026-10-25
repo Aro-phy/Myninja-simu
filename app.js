@@ -2,7 +2,7 @@ import { simulate, simulateMany, validateTeam, resolveKit, DEFAULT_RULES, ROLE_L
 import { NINJAS, EQUIPMENT, SAMPLE_STATS } from './data.js';
 import * as D from './describe.js';
 
-const STORE_KEY = 'myninja-sim-v2';
+const STORE_KEY = 'myninja-sim-v3';
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 const eqById = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
 const ROWS = [
@@ -41,18 +41,18 @@ function demoState() {
   return {
     teams: [
       { name: 'Ma formation', slots: {
-        V0: { ninjaId: 'hidan-kakuzu', nature: 'water', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }), equipment: ['ex-pain-gear'] },
-        A0: { ninjaId: 'main', nature: 'fire', stats: demoStats(), equipment: [], attackType: 'physical' },
-        A1: { ninjaId: 'ex-assassin', nature: 'wind', stats: demoStats({ speed: 15e6 }), equipment: [] },
-        S0: { ninjaId: 'ex-healer', nature: 'water', stats: demoStats({ hp: 55e6 }), equipment: [] },
-        S1: { ninjaId: 'ex-controller', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        V0: { ninjaId: 'hinata-soccer', nature: 'earth', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }), equipment: [] },
+        A0: { ninjaId: 'main', stats: demoStats(), equipment: [], attackType: 'physical' },
+        A1: { ninjaId: 'sasuke-taka', nature: 'earth', stats: demoStats({ speed: 15e6 }), equipment: [] },
+        S0: { ninjaId: 'kamado-nezuko', nature: 'earth', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        S1: { ninjaId: 'uchiha-sarada', nature: 'earth', stats: demoStats({ hp: 55e6 }), equipment: [] },
       } },
-      { name: 'Adversaire', slots: {
-        V0: { ninjaId: 'hinata-soccer', nature: 'earth', stats: demoStats({ hp: 95e6, pdef: 15e6, mdef: 12e6 }), equipment: [] },
-        A0: { ninjaId: 'ex-assaulter', nature: 'fire', stats: demoStats({ patk: 48e6 }), equipment: [] },
-        A1: { ninjaId: 'ex-assassin', nature: 'wind', stats: demoStats({ speed: 14.6e6 }), equipment: [] },
-        S0: { ninjaId: 'ex-healer', nature: 'water', stats: demoStats({ hp: 55e6 }), equipment: ['ex-guren-acc'] },
-        S1: { ninjaId: 'ex-controller', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
+      { name: 'Équipe visée', slots: {
+        A0: { ninjaId: 'main', stats: demoStats(), equipment: [], attackType: 'physical' },
+        A1: { ninjaId: 'eveil-de-kawaki', nature: 'thunder', stats: demoStats({ speed: 14.6e6 }), equipment: [] },
+        A2: { ninjaId: 'hashirama-madara', nature: 'thunder', stats: demoStats({ hp: 80e6 }), equipment: [] },
+        S0: { ninjaId: 'xmas-temari', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        S1: { ninjaId: 'natsu-dragneel', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
       } },
     ],
     rules: { ...DEFAULT_RULES },
@@ -267,12 +267,24 @@ function runOne() {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function runMany() {
+// Simulation par paquets pour garder la page réactive, avec progression affichée.
+async function runMany() {
   const teams = checkTeams();
   if (!teams) return;
   const n = Math.min(20000, Math.max(10, Math.round(parseNum($('#manyN').value))));
   const seed = Math.round(parseNum($('#seed').value));
-  const r = simulateMany(teams[0], teams[1], n, { seed, rules: state.rules });
+  const btn = $('#runMany');
+  btn.disabled = true;
+  const r = { n, wins: [0, 0], draws: 0, timeouts: 0, rounds: 0 };
+  for (let i = 0; i < n; i += 50) {
+    const part = simulateMany(teams[0], teams[1], Math.min(50, n - i), { seed: seed + i, rules: state.rules });
+    r.wins[0] += part.wins[0]; r.wins[1] += part.wins[1]; r.draws += part.draws; r.timeouts += part.timeouts; r.rounds += part.rounds;
+    btn.textContent = `Simulation… ${Math.min(n, i + 50)} / ${n}`;
+    await new Promise((res) => setTimeout(res, 0));
+  }
+  r.avgRounds = r.rounds / n;
+  btn.disabled = false;
+  btn.textContent = 'Simuler plusieurs combats';
   const pa = (100 * r.wins[0]) / n, pb = (100 * r.wins[1]) / n, pd = (100 * r.draws) / n;
   const panel = $('#manyPanel');
   panel.hidden = false;

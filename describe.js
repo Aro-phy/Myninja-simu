@@ -11,6 +11,8 @@ const STAT = {
   ccRate: 'taux de contrôle', ccRes: 'résistance au contrôle', reflectRes: 'résistance au renvoi', ignoreDef: 'ignore défense',
   immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', recovery: 'taux de soin reçu',
   recoveryCut: 'baisse du taux de soin', healCut: 'réduction de soin', penBonus: 'dégâts de pénétration', penMalus: 'résistance à la pénétration',
+  pdefShield: 'bouclier de défense physique', mdefShield: 'bouclier de défense stratégique', dotBonus: 'dégâts des DoT',
+  shieldPierce: 'résistance aux boucliers de défense', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',
 };
 const IMMUNE_EXTRA = { furyReduction: 'réduction de fury', superDodge: 'Super Dodge (l\'ignore)', sSuperDodge: 'S-Super Dodge (l\'ignore)' };
 const PICK = {
@@ -48,6 +50,7 @@ export function effect(e) {
   const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
   const to = target(e.to);
   const dur = e.duration === Infinity ? ' (permanent)' : e.duration ? ` pendant ${e.duration} tour${e.duration > 1 ? 's' : ''}` : '';
+  if (e.hot) return `${ch}soin continu (taux ${e.hot} %) sur ${to}${dur}`;
   if (e.heal) return `${ch}soigne ${to} (taux ${e.heal} %)`;
   if (e.penetration) return `${ch}pénétration ${e.attackType === 'magic' ? 'stratégique ' : e.attackType === 'physical' ? 'physique ' : ''}${e.penetration} % sur ${to}`;
   if (e.dot) return `${ch}${e.dot.name} (taux ${e.dot.pct} %) sur ${to} pendant ${e.dot.duration} tour(s)`;
