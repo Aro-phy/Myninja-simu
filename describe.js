@@ -41,6 +41,10 @@ export function target(t) {
   if (t.nature) s += ` de chakra ${join(list(t.nature).map((n) => NATURES[n].toLowerCase()))}`;
   if (t.tag) s += ` [${t.tag}]`;
   if (t.excludeSelf) s += ' (sauf lui-même)';
+  if (t.gender) s += t.gender === 'male' ? ' masculins' : ' féminins';
+  if (t.name) s += ` « ${list(t.name).join(' », « ')} »`;
+  if (t.main) s = 'le personnage principal';
+  if (Array.isArray(t.count)) s = s.replace(/^\S+ /, `${t.count[0]} à ${t.count[1]} `);
   return s;
 }
 
@@ -50,6 +54,8 @@ export function effect(e) {
   const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
   const to = target(e.to);
   const dur = e.duration === Infinity ? ' (permanent)' : e.duration ? ` pendant ${e.duration} tour${e.duration > 1 ? 's' : ''}` : '';
+  if (e.oneOf) return `${ch}un seul au hasard${e.weights ? ` (${e.weights.join(' / ')} %)` : ''} : ${e.oneOf.map((g) => g.map(effect).join(' + ')).join(' OU ')}`;
+  if (e.strike) return `${ch}inflige ${e.strike} % de dégâts${e.attackType === 'physical' ? ' physiques' : e.attackType === 'magic' ? ' stratégiques' : ''} à ${to}`;
   if (e.hot) return `${ch}soin continu (taux ${e.hot} %) sur ${to}${dur}`;
   if (e.heal) return `${ch}soigne ${to} (taux ${e.heal} %)`;
   if (e.penetration) return `${ch}pénétration ${e.attackType === 'magic' ? 'stratégique ' : e.attackType === 'physical' ? 'physique ' : ''}${e.penetration} % sur ${to}`;
@@ -68,8 +74,10 @@ export function effect(e) {
 }
 
 export function talent(p) {
-  if (p.on === 'attacked') return `Après avoir été attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
-  if (p.on === 'death') return `À sa mort${p.once !== false ? ' (1 fois)' : ''} : ${p.effects.map(effect).join(' ; ')}`;
+  const cond = p.cond === 'hpHigher' ? ', si ses PV sont supérieurs à ceux de l\'attaquant' : p.cond === 'hpLower' ? ', si ses PV sont inférieurs à ceux de l\'attaquant' : p.requires ? `, sous « ${p.requires} »` : '';
+  if (p.on === 'attacked') return `Après avoir été attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''}${cond} : ${p.effects.map(effect).join(' ; ')}`;
+  if (p.on === 'acted') return `Après avoir attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
+  if (p.on === 'death') return `À sa mort${p.effects.some((e) => e.revive) ? ' (1 fois)' : ''}${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
   const parts = [];
   if (p.mods?.length) {
     const selfFixed = (p.to || 'self') === 'self' && !p.scale;

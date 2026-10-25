@@ -79,6 +79,8 @@ export const STATUSES = {
   silence: other('Silence'),
   forbidFury: other('Forbid fury'),
   void: other('Vide'),
+  fear: other('Fear'),
+  normalForbid: { name: 'Attaque normale interdite', type: 'cc', cleansable: true, flags: { cc: 'noNormal' } },
   collapse: other('Effondrement'),
   // Emprisonnement des âmes (Hyakki Sasori, posé sur ses alliés) : pas de gain de fury, +15 % contrôle et résistance.
   soulPrison: { name: 'Emprisonnement des âmes', type: 'buff', cleansable: false, value: 15, flags: { noFury: true },

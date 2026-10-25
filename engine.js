@@ -236,7 +236,7 @@ function resolve(sel, caster, units, rng, rules) {
   if (!pool.length && roles && sel.fallback !== false && rules?.roleFallback && sel.side !== 'ally') {
     return resolve({ side: sel.side, pick: 'front-row' }, caster, units, rng, rules);
   }
-  const count = sel.count || 1;
+  const count = Array.isArray(sel.count) ? sel.count[0] + Math.floor(rng() * (sel.count[1] - sel.count[0] + 1)) : sel.count || 1;
   const sortBy = (fn, dir) => [...pool].sort((a, b) => dir * (fn(a) - fn(b))).slice(0, count);
   switch (sel.pick || 'all') {
     case 'all': return pool;
@@ -499,6 +499,14 @@ export function simulate(teamA, teamB, opts = {}) {
   // ctx : { hit: [cibles touchées], attacker: unité qui vient d'attaquer (déclencheurs), lost: Map PV perdus }
   function runEffects(owner, effects, ctx = {}) {
     for (const eff of effects || []) {
+      if (eff.oneOf) { // un seul des groupes d'effets, tiré au hasard (pondéré par `weights`)
+        if (eff.chance != null && eff.chance < 100 && !roll(eff.chance / 100)) continue;
+        const w = eff.weights || eff.oneOf.map(() => 1);
+        let r = rng() * w.reduce((a, b) => a + b, 0), i = 0;
+        while (i < w.length - 1 && (r -= w[i]) > 0) i++;
+        runEffects(owner, eff.oneOf[i], ctx);
+        continue;
+      }
       let targets;
       if (eff.to === 'target' || eff.to === undefined) targets = ctx.hit || [];
       else if (eff.to === 'attacker') targets = ctx.attacker ? [ctx.attacker] : [];
@@ -520,7 +528,8 @@ export function simulate(teamA, teamB, opts = {}) {
   }
 
   function applyOne(owner, t, eff, ctx) {
-    if (eff.hot) addStatus(owner, t, { name: `Soin continu ${eff.hot} %`, type: 'buff', duration: eff.duration ?? 2, cleansable: true, flags: { hot: eff.hot } });
+    if (eff.strike) strike(owner, t, eff.strike, 1, 'coup', eff.attackType || owner.attackType, { hit: [], lost: new Map() });
+    else if (eff.hot) addStatus(owner, t, { name: `Soin continu ${eff.hot} %`, type: 'buff', duration: eff.duration ?? 2, cleansable: true, flags: { hot: eff.hot } });
     else if (eff.heal) heal(owner, t, eff.heal);
     else if (eff.penetration) {
       const dk = dodgeKind(owner, t);
@@ -569,6 +578,11 @@ export function simulate(teamA, teamB, opts = {}) {
   function act(u, mode) {
     const sealed = u.effects.find((e) => e.flags?.cc === 'seal');
     const canSpecial = u.kit.special && u.fury >= rules.specialCost;
+    const noNormal = u.effects.find((e) => e.flags?.cc === 'noNormal');
+    if (noNormal && (mode === 'aid' || !canSpecial || sealed)) {
+      L('info', `${who(u)} est sous ${noNormal.name} : attaque normale impossible.`, { actor: u.uid });
+      return;
+    }
     const useSpecial = mode !== 'aid' && canSpecial && !sealed;
     const skill = useSpecial ? u.kit.special : u.kit.normal;
     const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide'
@@ -622,6 +636,9 @@ export function simulate(teamA, teamB, opts = {}) {
       if (!t.alive) continue;
       for (const tr of t.triggers) {
         if (tr.on !== 'attacked') continue;
+        if (tr.cond === 'hpHigher' && !(t.hp > u.hp)) continue;
+        if (tr.cond === 'hpLower' && !(t.hp < u.hp)) continue;
+        if (tr.requires && !t.effects.some((e) => e.name === tr.requires)) continue;
         if (tr.chance != null && tr.chance < 100 && !roll(tr.chance / 100)) continue;
         runEffects(t, tr.effects, { attacker: u, lost: ctx.lost, hit: [] });
       }
