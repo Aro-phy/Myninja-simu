@@ -25,6 +25,39 @@ const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
 export const GEAR_SETS = [
   // ----- Sets lus dans la vidéo des fils Discord « gear-and-accessories » -----
   {
+    id: 'gear-crystalys', name: 'Crystalys',
+    tiers: {
+      2: [self(m('atk', 20), m('dr', 15))],
+      4: [self(m('atk', 20), m('finalDmg', 15)), afterSkill(st(role('ally', 'supporter'), 'strong', 2, { value: 10, ...C }))],
+      6: [self(m('atk', 5), m('dr', 15), m('weakenAtk', 25)), afterSkill(st(role('enemy', 'assaulter'), 'chaoticStorm', 2, { value: 10 }))],
+    },
+  },
+  {
+    id: 'gear-defiance', name: 'Defiance',
+    tiers: {
+      2: [self(m('air', 30), m('hp', 30))],
+      4: [self(m('finalReduction', 30), m('weakenAtk', 30))],
+      6: [self(m('hp', 30), m('dodge', 30), m('ccRes', 25)),
+        afterSkill(st(SELF, 'shielding', 2, C), st(rand('ally', 1), 'shielding', 2, { chance: 35, ...C }))],
+    },
+  },
+  {
+    id: 'gear-flamvell', name: 'Flamvell',
+    tiers: {
+      2: [self(m('atk', 20), m('air', 20))],
+      4: [self(m('finalReduction', 25), m('weakenAtk', 30))],
+      6: [self(m('atk', 20), m('ccRes', 25), m('dr', 25)), afterSkill({ to: ENEMIES, penetration: 50, attackType: 'physical' })],
+    },
+  },
+  {
+    id: 'gear-vylon', name: 'Vylon',
+    tiers: {
+      2: [self(m('hp', 30), m('air', 40))],
+      4: [self(m('dr', 45), m('atk', 30)), afterSkill({ to: rand('enemy', 2), cleanse: 'buff' })],
+      6: [self(m('weakenAtk', 30), m('air', 30)), afterSkill(together(70, st(role('ally', 'supporter'), 'superarmor', 2, C)))],
+    },
+  },
+  {
     id: 'gear-izanami', name: 'Izanami',
     tiers: {
       2: [self(m('atk', 20), m('air', 20))],
@@ -115,7 +148,7 @@ export const GEAR_SETS = [
     },
   },
   {
-    id: 'gear-red', name: 'Équipement rouge (nom provisoire)',
+    id: 'gear-red', name: 'Summoning',
     tiers: {
       2: [self(m('hp', 25), m('air', 20))], // + Agilité / Chakra 25 000
       4: [
@@ -197,7 +230,7 @@ export const GEAR_SETS = [
     tiers: {
       2: [self(m('atk', 20), m('dr', 30))], // + Agilité 25 000
       4: [
-        self(m('matk', 15), m('finalDmg', 20)),
+        self(m('matk', 15), m('finalDmg', 10)),
         afterSkill(debuff(role('enemy', 'assaulter'), 2, [m('dr', -30)]), st(ALLIES_BUT_SELF, 'windEscape', 2, { value: 10, ...C })),
       ],
       6: [
@@ -213,6 +246,16 @@ const p = (id, _unused, ...talents) => ({ id, name: { force: 'Force', chakra: 'C
 
 export const ACCESSORY_SETS = [
   // ----- Sets lus dans la vidéo des fils Discord « gear-and-accessories » -----
+  {
+    id: 'acc-iron-will', name: 'Accessoires Iron Will',
+    pairs: [
+      p('force', 0, self(m('ccRes', 30), m('hp', 20)), afterSkill(st(rand('ally', 2), 'bond', 2, { value: 10, ...C }))),
+      p('chakra', 0, self(m('ccRes', 30), m('mdef', 20), m('pdef', 20)), afterSkill(st(rand('ally', 2), 'strong', 2, { value: 10, ...C }))),
+      p('agility', 0, self(m('ccRes', 30), m('air', 17)), afterSkill(buff(rand('ally', 2), 2, [m('finalReduction', 20)]))),
+      p('power', 0, self(m('ccRes', 30), m('finalReduction', 17), m('weakenAtk', 20))),
+    ],
+    full: [self(m('weakenAtk', 3)), afterSkill({ to: SELF, cleanse: 'debuff' })],
+  },
   {
     id: 'acc-izanami', name: 'Accessoires Izanami',
     pairs: [
@@ -334,7 +377,7 @@ export const ACCESSORY_SETS = [
     full: [self(m('ccRes', 2), m('weakenAtk', 25), m('finalReduction', 10), m('air', 10))],
   },
   {
-    id: 'acc-red', name: 'Accessoires rouges (nom provisoire)',
+    id: 'acc-red', name: 'Accessoires Summoning',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('ccRes', 30), m('atk', 30), m('air', 10))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('ccRes', 30), m('def', 30), m('dr', 25))] },
