@@ -1,6 +1,6 @@
 // Traduit la fiche d'un ninja (données du simulateur) en français lisible, pour vérifier la transcription.
 import { STATUSES } from './statuses.js';
-import { ROLE_LABEL, NATURES } from './engine.js';
+import { ROLE_LABEL, NATURES, PANEL_STATS } from './engine.js';
 
 const STAT = {
   atk: 'attaque', patk: 'attaque physique', matk: 'attaque stratégique', def: 'défenses', pdef: 'déf. physique', mdef: 'déf. stratégique',
@@ -47,7 +47,7 @@ const mods = (ms) => ms.map((x) => `${STAT[x.stat] || x.stat} ${x.value > 0 ? '+
 export function effect(e) {
   const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
   const to = target(e.to);
-  const dur = e.duration ? ` pendant ${e.duration} tour${e.duration > 1 ? 's' : ''}` : '';
+  const dur = e.duration === Infinity ? ' (permanent)' : e.duration ? ` pendant ${e.duration} tour${e.duration > 1 ? 's' : ''}` : '';
   if (e.heal) return `${ch}soigne ${to} (taux ${e.heal} %)`;
   if (e.penetration) return `${ch}pénétration ${e.attackType === 'magic' ? 'stratégique ' : e.attackType === 'physical' ? 'physique ' : ''}${e.penetration} % sur ${to}`;
   if (e.dot) return `${ch}${e.dot.name} (taux ${e.dot.pct} %) sur ${to} pendant ${e.dot.duration} tour(s)`;
@@ -68,7 +68,13 @@ export function talent(p) {
   if (p.on === 'attacked') return `Après avoir été attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
   if (p.on === 'death') return `À sa mort${p.once !== false ? ' (1 fois)' : ''} : ${p.effects.map(effect).join(' ; ')}`;
   const parts = [];
-  if (p.mods?.length) parts.push(`${target(p.to || 'self')} : ${mods(p.mods)}${p.scale ? ` par tranche de ${p.scale} % de PV perdus` : ''}`);
+  if (p.mods?.length) {
+    const selfFixed = (p.to || 'self') === 'self' && !p.scale;
+    const inPanel = selfFixed ? p.mods.filter((x) => PANEL_STATS.has(x.stat)) : [];
+    const applied = p.mods.filter((x) => !inPanel.includes(x));
+    if (applied.length) parts.push(`${target(p.to || 'self')} : ${mods(applied)}${p.scale ? ` par tranche de ${p.scale} % de PV perdus` : ''}`);
+    if (inPanel.length) parts.push(`lui-même : ${mods(inPanel)} (déjà compté dans les stats saisies)`);
+  }
   if (p.immune?.length) parts.push(`Immunisé : ${p.immune.map((i) => IMMUNE_EXTRA[i] || STATUSES[i]?.name || i).join(', ')}`);
   return parts.join(' · ');
 }

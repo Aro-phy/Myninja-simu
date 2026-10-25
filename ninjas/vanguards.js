@@ -221,7 +221,7 @@ export const VANGUARDS = [
     ],
     awakenings: [
       { name: 'Fuuton: Gale Palm', talents: [{ on: 'attacked', chance: 30, effects: [{ to: nature('ally', 'wind'), cleanse: 'debuff' }] }] },
-      { name: 'Éveil 2', talents: [{ on: 'attacked', effects: [debuff(ALLIES, 1, [m('aid', -90)])] }] },
+      { name: 'Éveil 2', talents: [{ on: 'attacked', effects: [debuff(ALLIES, Infinity, [m('aid', -90)])] }] },
     ],
     special: {
       name: 'Ultra-Big Ball Rasengan', hits: [{ target: rand('enemy', 2), pct: 480 }], fury: FURY_68,
@@ -275,7 +275,7 @@ export const VANGUARDS = [
     ],
     awakenings: [{ name: 'Psychic Panda', talents: [self(m('block', 30)), immune('blind')] }],
     normal: {
-      hits: [{ target: 'front-row', pct: 150 }],
+      hits: [allHit(150)],
       effects: [
         heal(120),
         st(nature('enemy', 'earth'), 'seal', 2), st(nature('enemy', 'earth'), 'upwind', 2), { to: nature('enemy', 'earth'), cleanse: 'buff' },
@@ -343,7 +343,8 @@ export const VANGUARDS = [
       immune('imprison', 'blind', 'deathSeed'),
     ],
     awakenings: [{ name: 'Will of Fire', talents: [self(m('atk', 10), m('dr', 10))] }],
-    special: {
+    // Son attaque normale est décrite comme une compétence.
+    normal: {
       name: 'Majestic Attire: Susano', hits: [allHit(330)], fury: FURY_50,
       effects: [
         { to: TARGET, penetration: 50, chance: 70 },
@@ -353,8 +354,7 @@ export const VANGUARDS = [
         buff(ALLIES, 2, [m('aid', 30), m('def', 30, 'icon')]),
       ],
     },
-    // Seconde compétence (usage à confirmer) : non utilisée par le moteur pour l'instant.
-    altSpecial: {
+    special: {
       name: 'Scorch Release: Halo Hurricane Jet Black Arrow Style Zero', hits: [allHit(330)], fury: { self: 0, allies: 50 },
       effects: [
         st(rand('enemy', 2), 'deathSeed', 2),
@@ -404,7 +404,7 @@ export const VANGUARDS = [
     ],
     awakenings: [
       { name: 'Éveil 1', talents: [immune('superDodge', 'sSuperDodge')] },
-      { name: 'Éveil 2', talents: [enemies(m('atk', -30)), { on: 'attacked', effects: [buff(SELF, 1, [m('speed', 20, 'icon')])] }] },
+      { name: 'Éveil 2', talents: [enemies(m('atk', -30)), { on: 'attacked', effects: [buff(SELF, Infinity, [m('speed', 20, 'icon')])] }] },
       { name: 'Éveil 3 (carte spéciale)', base: { speed: 86, dr: 70, air: 60 },
         talents: [allies(m('speed', 2)), self(m('dr', 40)), immune('weakened', 'charm')],
         specialEffects: [

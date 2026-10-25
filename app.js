@@ -29,6 +29,7 @@ const RULE_FIELDS = [
   ['maxRounds', 'Limite de rounds (puis victoire aux PV restants)', 'number'],
   ['defenseMode', 'Formule de défense', 'select', [['corrected', 'Corrigée'], ['excel', 'Identique à l\'Excel']]],
   ['applyBaseLine', 'Ajouter la ligne de base du talent (vitesse, Dégâts, Absorption propres) aux stats saisies', 'bool'],
+  ['selfStatsInPanel', 'Les bonus fixes « self » sur les stats de l\'écran du ninja sont déjà dans les stats saisies', 'bool'],
   ['punchIsExtraTurn', '« Punch rate » des descriptions = Tour Bonus (sinon = Aide)', 'bool'],
   ['roleFallback', 'Attaque sur un poste vide : viser la première ligne', 'bool'],
 ];
@@ -95,7 +96,7 @@ function toTeam(t) {
     members.push({
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
-      nature: m.nature || 'none', awakening: m.awakening,
+      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', awakening: m.awakening,
       equipment: (m.equipment || []).map((id) => eqById[id]).filter(Boolean),
     });
   }
@@ -123,7 +124,7 @@ function renderTeam(ti) {
       const btn = el('button', { class: `slot${n ? ' filled' : ''}`, type: 'button', id: `slot-${ti}-${key}`,
         'aria-label': n ? `Modifier ${n.name}` : `Ajouter un ninja (${row.label})`, onclick: () => openEditor(ti, key) },
       n ? [el('span', { class: 'nm' }, m.label || n.name),
-        el('span', { class: 'st' }, `${NATURES[m.nature || 'none']} · PV ${short(m.stats.hp || 0)}`)]
+        el('span', { class: 'st' }, `${n.isMain ? 'Principal' : NATURES[m.nature || 'none']} · PV ${short(m.stats.hp || 0)}`)]
         : el('span', { class: 'empty' }, '+ Ajouter'));
       col.append(btn);
     }
@@ -166,7 +167,7 @@ function openEditor(ti, key) {
           el('option', { value: '' }, '— choisir —'),
           options.map((o) => el('option', { value: o.id, selected: o.id === draft.ninjaId }, o.name)))),
       n ? el('div', { class: 'two' },
-        el('label', { class: 'field', for: 'f-nature' }, 'Nature de chakra',
+        n.isMain ? null : el('label', { class: 'field', for: 'f-nature' }, 'Nature de chakra',
           el('select', { id: 'f-nature', onchange: (e) => { draft.nature = e.target.value; } },
             Object.entries(NATURES).map(([k, v]) => el('option', { value: k, selected: (draft.nature || 'none') === k }, v)))),
         n.awakenings?.length ? el('label', { class: 'field', for: 'f-aw' }, 'Niveau d\'éveil',

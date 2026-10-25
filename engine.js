@@ -15,11 +15,15 @@ export const DEFAULT_RULES = {
   maxRounds: 20,           // limite de rounds ; au-delà : la formation avec le plus de PV restants gagne
   defenseMode: 'corrected',// 'excel' = reproduit le bug de la cellule DEF de l'Excel
   applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
+  selfStatsInPanel: true,  // les bonus fixes « self » sur des stats visibles à l'écran du ninja y sont déjà inclus
   punchIsExtraTurn: true,  // « punch rate » des descriptions = Tour Bonus (sinon = Aide)
   roleFallback: true,      // une attaque sur un poste vide (ex. « les supports ») vise la première ligne à la place
 };
 
 export const ROWS = { vanguard: 'V', assaulter: 'A', supporter: 'S' };
+// Stats visibles sur l'écran du ninja : un bonus fixe « self » sur l'une d'elles y est déjà compté.
+export const PANEL_STATS = new Set(['hp', 'atk', 'patk', 'matk', 'def', 'pdef', 'mdef', 'dr', 'air', 'hit', 'dodge', 'crit',
+  'antiCrit', 'sAtk', 'block', 'punch', 'extraTurn', 'aid', 'speed']);
 const ROW_ORDER = ['V', 'A', 'S'];
 export const ROLE_LABEL = { vanguard: 'Avant-garde', assaulter: 'Attaquant', supporter: 'Support' };
 export const NATURES = { none: 'Non activé', earth: 'Terre', fire: 'Feu', thunder: 'Foudre', water: 'Eau', wind: 'Vent' };
@@ -239,8 +243,10 @@ export function simulate(teamA, teamB, opts = {}) {
   function applyEntry(owner, p, source) {
     if (p.on) { owner.triggers.push({ ...p, source, used: false }); return; }
     const targets = R(p.to || 'self', owner);
+    const selfOnly = (p.to || 'self') === 'self' && !p.scale;
     for (const t of targets) {
       for (const m of p.mods || []) {
+        if (selfOnly && rules.selfStatsInPanel && PANEL_STATS.has(m.stat)) continue;
         t.passives.push({ ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}) });
       }
       for (const im of p.immune || []) t.immune.add(im);
@@ -299,7 +305,15 @@ export function simulate(teamA, teamB, opts = {}) {
       dot: eff.dot,
       source: src,
     };
-    tgt.effects = tgt.effects.filter((x) => !(x.id === e.id && x.source === src));
+    // Un effet déjà présent n'est pas cumulé en valeur : on additionne sa durée.
+    const existing = tgt.effects.find((x) => x.id === e.id);
+    if (existing) {
+      if (Number.isFinite(existing.remaining) && Number.isFinite(e.remaining)) {
+        existing.remaining += e.remaining;
+        if (!silent) L('effect', `${who(tgt)} : ${name} prolongé (${existing.remaining} tour(s)).`, { target: tgt.uid });
+      } else existing.remaining = Infinity;
+      return true;
+    }
     tgt.effects.push(e);
     if (!silent) {
       const v = value != null && !e.dot && def.mods ? ` (${value} %)` : '';
@@ -487,7 +501,8 @@ export function simulate(teamA, teamB, opts = {}) {
     const canSpecial = u.kit.special && u.fury >= rules.specialCost;
     const useSpecial = mode !== 'aid' && canSpecial && !sealed;
     const skill = useSpecial ? u.kit.special : u.kit.normal;
-    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide' : 'une attaque normale';
+    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide'
+      : skill.name ? `l'attaque normale « ${skill.name} »` : 'une attaque normale';
     L('action', `${who(u)} utilise ${name} (fury ${fmt(u.fury)}).`, { actor: u.uid, special: useSpecial });
     if (sealed && canSpecial && mode !== 'aid') L('info', `${who(u)} est sous ${sealed.name} : spéciale impossible.`, { actor: u.uid });
     const ctx = { hit: [], attacker: u, lost: new Map() };
@@ -509,19 +524,23 @@ export function simulate(teamA, teamB, opts = {}) {
       for (const pr of u.procs) if (!pr.on || pr.on === 'any' || (pr.on === 'special') === useSpecial) runEffects(u, [pr], ctx);
     }
     // fury
+    // Une compétence (spéciale ou attaque normale décrite) peut fixer sa propre récupération de fury.
+    const f = skill.fury;
+    const restore = () => {
+      if (f.self) changeFury(u, u, f.self);
+      if (f.allies) for (const a of units) if (a.alive && a.team === u.team && a !== u) changeFury(u, a, f.allies);
+    };
     if (useSpecial) {
       u.fury -= rules.specialCost;
-      const f = skill.fury;
       if (f) {
-        if (f.self) changeFury(u, u, f.self);
-        if (f.allies) for (const a of units) if (a.alive && a.team === u.team && a !== u) changeFury(u, a, f.allies);
+        restore();
         L('info', `Fury : ${who(u)} dépense ${rules.specialCost}${f.self ? `, récupère ${f.self}` : ''}${f.allies ? `, alliés +${f.allies}` : ''}.`, { actor: u.uid });
       } else {
         for (const a of units) if (a.alive && a.team === u.team) changeFury(u, a, rules.specialTeamFury);
         L('info', `Fury : ${who(u)} dépense ${rules.specialCost}, toute la formation gagne ${rules.specialTeamFury}.`, { actor: u.uid });
       }
     } else if (mode !== 'aid' || rules.aidGivesFury) {
-      changeFury(u, u, rules.normalFury);
+      if (f) restore(); else changeFury(u, u, rules.normalFury);
     }
     // déclencheurs « après avoir été attaqué »
     for (const t of struck) {
