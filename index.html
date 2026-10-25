@@ -133,7 +133,28 @@ dialog::backdrop { background: rgb(10 14 24 / 0.55); }
 .kit { display: grid; gap: 10px; margin-top: 10px; }
 .kit ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 3px; }
 .kit li { overflow-wrap: anywhere; }
-.gear { display: grid; gap: 8px; }
+.gear { display: grid; gap: 10px; }
+.eq-grid { display: grid; gap: 6px; }
+.eq-grid-gear { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.eq-grid-acc { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.eq-pair { display: grid; gap: 6px; }
+.eq-box { font: inherit; text-align: left; display: grid; gap: 1px; padding: 6px 8px; min-height: 52px; min-width: 0; cursor: pointer;
+  border: 1px dashed var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); }
+.eq-box.filled { border-style: solid; background: var(--surface); }
+.eq-box.active { outline: 2px solid var(--team-a); outline-offset: 1px; }
+.eq-slot { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.eq-name { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.eq-picker { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.eq-picker-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.eq-picker input[type="search"] { width: 100%; font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.eq-list-scroll { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; display: grid; gap: 2px; }
+.eq-list-scroll li { display: flex; gap: 4px; }
+.eq-pick { flex: 1; text-align: left; font: inherit; font-size: 14px; padding: 6px 8px; border: 0; border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.eq-pick:hover, .eq-all:hover { background: var(--team-a-soft); }
+.eq-all { font: inherit; font-size: 12px; padding: 4px 8px; border: 0; border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.eq-active details summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.eq-active ul { margin: 2px 0 6px; padding-left: 18px; font-size: 13px; }
+@media (max-width: 480px) { .eq-grid-acc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .eq-set { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .eq-set details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .eq-set ul { margin: 2px 0 6px; padding-left: 18px; font-size: 13px; }

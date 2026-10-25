@@ -478,7 +478,7 @@ export function equipmentEntries(choice = {}) {
   const out = [];
   for (const [id, pieces] of Object.entries(choice.gear || {})) {
     const g = gearById[id];
-    if (!g || !pieces) continue;
+    if (!g || !pieces || pieces < 2) continue; // aucun bonus sous 2 pièces
     const talents = [2, 4, 6].filter((t) => pieces >= t).flatMap((t) => g.tiers[t] || []);
     out.push({ name: `${g.name} (${pieces} pièces)`, talents });
   }
@@ -490,6 +490,38 @@ export function equipmentEntries(choice = {}) {
     out.push({ name: `${a.name} (${pairs.length * 2} pièces)`, talents });
   }
   return out;
+}
+
+// Emplacements de la fiche : 6 pièces d'équipement, 8 accessoires (2 par paire).
+export const GEAR_SLOTS = ['Attaque physique', 'Défense physique', 'Attaque stratégique', 'Défense stratégique', 'Vitesse', 'Puissance'];
+export const ACC_SLOTS = [
+  { pair: 'force', label: 'Force' }, { pair: 'force', label: 'Force' },
+  { pair: 'chakra', label: 'Chakra' }, { pair: 'chakra', label: 'Chakra' },
+  { pair: 'agility', label: 'Agilité' }, { pair: 'agility', label: 'Agilité' },
+  { pair: 'power', label: 'Puissance' }, { pair: 'power', label: 'Puissance' },
+];
+
+// Pièce par pièce → choix par set : nombre de pièces d'équipement par set, et paires complètes d'accessoires
+// (les 2 accessoires d'une paire doivent venir du même set ; les 4 paires du même set donnent le bonus 8 pièces).
+export function slotsToChoice(slots = {}) {
+  const gear = {}, acc = {};
+  for (const id of slots.gear || []) if (id) gear[id] = (gear[id] || 0) + 1;
+  const a = slots.acc || [];
+  for (let i = 0; i < ACC_SLOTS.length; i += 2) {
+    if (a[i] && a[i] === a[i + 1]) (acc[a[i]] ||= []).push(ACC_SLOTS[i].pair);
+  }
+  return { gear, acc };
+}
+
+// Ancien format ({ gear: { set: pièces }, acc: { set: [paires] } }) → emplacements.
+export function choiceToSlots(choice = {}) {
+  const gear = Array(GEAR_SLOTS.length).fill(null), acc = Array(ACC_SLOTS.length).fill(null);
+  let i = 0;
+  for (const [id, n] of Object.entries(choice.gear || {})) for (let k = 0; k < n && i < gear.length; k++) gear[i++] = id;
+  for (const [id, pairs] of Object.entries(choice.acc || {})) {
+    for (const pair of pairs || []) ACC_SLOTS.forEach((s, j) => { if (s.pair === pair && !acc[j]) acc[j] = id; });
+  }
+  return { gear, acc };
 }
 
 export function checkEquipment(choice = {}) {

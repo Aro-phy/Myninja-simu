@@ -1,6 +1,6 @@
 import { simulate, simulateMany, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
 import { NINJAS, SAMPLE_STATS } from './data.js';
-import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, checkEquipment } from './equipment.js';
+import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
 
 const STORE_KEY = 'myninja-sim-v3';
@@ -97,7 +97,7 @@ function toTeam(t) {
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
       nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
-      equipment: equipmentEntries(m.gear),
+      equipment: equipmentEntries(slotsToChoice(m.equip || choiceToSlots(m.gear))),
     });
   }
   return { name: t.name, members };
@@ -149,36 +149,81 @@ function kitView(n, level) {
     section(`Spéciale${kit.special?.name ? ` · ${kit.special.name}` : ''}`, D.skill(kit.special)));
 }
 
-// Choix des équipements (pièces par set) et des accessoires (paires par set), avec le détail des bonus.
+// Équipement pièce par pièce (6 cases) et accessoires (8 cases, par paires), avec une liste de sets
+// défilante et une barre de recherche pour équiper la case sélectionnée.
+const gearById = Object.fromEntries(GEAR_SETS.map((g) => [g.id, g]));
+const accById = Object.fromEntries(ACCESSORY_SETS.map((a) => [a.id, a]));
+const shortName = (set) => set.name.replace(/^Accessoires /, '');
+const norm = (x) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
 function gearView(draft) {
-  const g = draft.gear;
-  const err = el('div', { class: 'error', id: 'f-eq-err', role: 'alert' });
-  const refresh = () => { err.textContent = checkEquipment(g).join(' '); };
+  const eq = draft.equip;
+  const root = el('div', { class: 'gear' });
+  let sel = { kind: 'gear', i: 0 };
+  let query = '';
   const bonusList = (entries) => el('ul', {}, entries.map((t) => el('li', {}, D.talent(t))).filter((li) => li.textContent));
-  const gearRows = GEAR_SETS.map((set) => el('div', { class: 'eq-set' },
-    el('label', { class: 'field', for: `f-g-${set.id}` }, set.name,
-      el('select', { id: `f-g-${set.id}`, onchange: (e) => { g.gear[set.id] = Number(e.target.value); refresh(); } },
-        [0, 2, 4, 6].map((n) => el('option', { value: n, selected: (g.gear[set.id] || 0) === n }, n ? `${n} pièces` : 'Aucune pièce')))),
-    el('details', {}, el('summary', {}, 'Bonus du set'),
-      ...[2, 4, 6].map((n) => el('div', {}, el('div', { class: 'note' }, `${n} pièces`), bonusList(set.tiers[n] || []))))));
-  const accRows = ACCESSORY_SETS.map((set) => el('div', { class: 'eq-set' },
-    el('div', { class: 'note' }, set.name),
-    el('div', { class: 'eq-list' }, set.pairs.map((p) => el('label', { for: `f-a-${set.id}-${p.id}` },
-      el('input', { type: 'checkbox', id: `f-a-${set.id}-${p.id}`, checked: (g.acc[set.id] || []).includes(p.id),
-        onchange: (e) => {
-          const cur = g.acc[set.id] || [];
-          g.acc[set.id] = e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id);
-          refresh();
-        } }),
-      `Paire ${p.name}`))),
-    el('details', {}, el('summary', {}, 'Bonus des paires'),
-      ...set.pairs.map((p) => el('div', {}, el('div', { class: 'note' }, `Paire ${p.name}`), bonusList(p.talents))),
-      el('div', {}, el('div', { class: 'note' }, '8 pièces (les 4 paires)'), bonusList(set.full)))));
-  return el('div', { class: 'gear' },
-    el('div', { class: 'col-label' }, 'Équipement (6 pièces au total)'), ...gearRows,
-    el('div', { class: 'col-label' }, 'Accessoires (4 paires au total)'), ...accRows,
-    el('p', { class: 'note' }, 'Les bonus de stats visibles à l\'écran du ninja sont déjà comptés dans les stats saisies : seuls les autres effets s\'appliquent en combat.'),
-    err);
+
+  const box = (kind, i, label) => {
+    const id = eq[kind][i];
+    const set = id && (kind === 'gear' ? gearById : accById)[id];
+    const active = sel.kind === kind && sel.i === i;
+    return el('button', { type: 'button', class: `eq-box${set ? ' filled' : ''}${active ? ' active' : ''}`, id: `eqb-${kind}-${i}`,
+      'aria-pressed': active ? 'true' : 'false',
+      onclick: () => { sel = { kind, i }; render(); setTimeout(() => root.querySelector('#eq-search')?.focus(), 0); } },
+    el('span', { class: 'eq-slot' }, label),
+    el('span', { class: 'eq-name' }, set ? shortName(set) : 'Vide'));
+  };
+
+  const equip = (id, all) => {
+    if (all) eq[sel.kind] = eq[sel.kind].map(() => id);
+    else {
+      eq[sel.kind][sel.i] = id;
+      const n = eq[sel.kind].length;
+      if (id && sel.i < n - 1) sel = { kind: sel.kind, i: sel.i + 1 }; // passe à la case suivante
+    }
+    render();
+  };
+
+  const picker = () => {
+    const sets = sel.kind === 'gear' ? GEAR_SETS : ACCESSORY_SETS;
+    const list = sets.filter((x) => !query || norm(shortName(x)).includes(norm(query)))
+      .sort((a, b) => shortName(a).localeCompare(shortName(b)));
+    const slotLabel = sel.kind === 'gear' ? `Équipement · ${GEAR_SLOTS[sel.i]}` : `Accessoire · ${ACC_SLOTS[sel.i].label} ${sel.i % 2 + 1}`;
+    const items = list.map((x) => el('li', {},
+      el('button', { type: 'button', class: 'eq-pick', onclick: () => equip(x.id) }, shortName(x)),
+      el('button', { type: 'button', class: 'eq-all', title: 'Équiper toutes les cases', onclick: () => equip(x.id, true) },
+        sel.kind === 'gear' ? '×6' : '×8')));
+    const search = el('input', { type: 'search', id: 'eq-search', placeholder: 'Rechercher un set…', value: query, autocomplete: 'off',
+      oninput: (e) => { query = e.target.value; const ul = root.querySelector('.eq-list-scroll'); ul.replaceChildren(...picker().querySelector('.eq-list-scroll').children); } });
+    return el('div', { class: 'eq-picker' },
+      el('div', { class: 'eq-picker-head' }, el('strong', {}, slotLabel),
+        el('button', { type: 'button', class: 'btn small', onclick: () => equip(null) }, 'Retirer la pièce')),
+      search,
+      el('ul', { class: 'eq-list-scroll' }, items.length ? items : [el('li', { class: 'note' }, 'Aucun set ne correspond.')]));
+  };
+
+  const summary = () => {
+    const entries = equipmentEntries(slotsToChoice(eq));
+    if (!entries.length) return el('p', { class: 'note' }, 'Aucun bonus actif : il faut au moins 2 pièces du même équipement, ou les 2 accessoires d\'une même paire.');
+    return el('div', { class: 'eq-active' }, el('div', { class: 'col-label' }, 'Bonus actifs'),
+      ...entries.map((e) => el('details', {}, el('summary', {}, e.name), bonusList(e.talents))));
+  };
+
+  const render = () => {
+    const focusSearch = document.activeElement?.id === 'eq-search';
+    root.replaceChildren(
+      el('div', { class: 'col-label' }, 'Équipement'),
+      el('div', { class: 'eq-grid eq-grid-gear' }, GEAR_SLOTS.map((l, i) => box('gear', i, l))),
+      el('div', { class: 'col-label' }, 'Accessoires (une paire = les 2 cases d\'une colonne)'),
+      el('div', { class: 'eq-grid eq-grid-acc' }, [0, 2, 4, 6].map((i) => el('div', { class: 'eq-pair' },
+        box('acc', i, `${ACC_SLOTS[i].label} 1`), box('acc', i + 1, `${ACC_SLOTS[i].label} 2`)))),
+      picker(),
+      summary(),
+      el('p', { class: 'note' }, 'Les bonus de stats visibles à l\'écran du ninja (et les Force, Agilité, Chakra, Puissance) sont déjà comptés dans les stats saisies : seuls les autres effets s\'appliquent en combat.'));
+    if (focusSearch) { const s = root.querySelector('#eq-search'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+  };
+  render();
+  return root;
 }
 
 function openEditor(ti, key) {
@@ -186,9 +231,8 @@ function openEditor(ti, key) {
   const row = ROWS.find((r) => r.key === key[0]);
   const current = t.slots[key];
   const draft = current ? structuredClone(current) : { ninjaId: '', stats: { ...SAMPLE_STATS } };
-  draft.gear ||= {};
-  draft.gear.gear ||= {};
-  draft.gear.acc ||= {};
+  if (!draft.equip) draft.equip = choiceToSlots(draft.gear);
+  delete draft.gear;
   const form = $('#dlgForm');
   const options = NINJAS.filter((n) => n.role === row.role);
   const render = () => {
@@ -226,8 +270,6 @@ function openEditor(ti, key) {
         current ? el('button', { class: 'btn danger', type: 'button', onclick: () => { delete t.slots[key]; done(); } }, 'Retirer de la formation') : el('span'),
         el('button', { class: 'btn primary', type: 'button', onclick: () => {
           if (!draft.ninjaId) { $('#f-ninja').focus(); return; }
-          const eqErr = checkEquipment(draft.gear);
-          if (eqErr.length) { $('#f-eq-err').textContent = eqErr.join(' '); return; }
           if (byId[draft.ninjaId].isMain && !draft.attackType) draft.attackType = 'physical';
           t.slots[key] = draft; done();
         } }, 'Enregistrer')),
