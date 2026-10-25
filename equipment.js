@@ -1,4 +1,6 @@
 // Équipements (sets de 6 pièces : bonus à 2, 4 et 6 pièces) et accessoires (4 paires + bonus à 8 pièces).
+// « Weaken enemy's ATK +X % » : réduit de X % l'attaque des ennemis qui frappent le porteur, pendant tout le combat
+// (équivalent de l'« ignore enemy attack in gear/acc » de l'Excel).
 // Les bonus de stats visibles à l'écran du ninja (PV, attaque, Dégâts, Absorption, défenses…) sont déjà
 // dans les stats saisies : le moteur les ignore (règle « selfStatsInPanel »). Les autres s'appliquent en combat.
 import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, rand, role, m, buff, debuff, st } from './ninjas/helpers.js';
@@ -6,6 +8,8 @@ import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, rand, role, m, buff, debuff, st
 const self = (...mods) => ({ to: SELF, mods });
 const attacked = (chance, ...effects) => ({ on: 'attacked', ...(chance < 100 ? { chance } : {}), effects });
 const afterSkill = (...effects) => ({ on: 'skill', effects });
+// Les buffs posés par un équipement ou un accessoire sont dissipables (sauf mention contraire).
+const C = { cleansable: true };
 
 export const GEAR_SETS = [
   {
@@ -14,11 +18,11 @@ export const GEAR_SETS = [
       2: [self(m('atk', 20), m('dr', 30))], // + Agilité 25 000
       4: [
         self(m('matk', 15), m('finalDmg', 20)),
-        afterSkill(debuff(role('enemy', 'assaulter'), 2, [m('dr', -30)]), st(ALLIES_BUT_SELF, 'windEscape', 2, { value: 10 })),
+        afterSkill(debuff(role('enemy', 'assaulter'), 2, [m('dr', -30)]), st(ALLIES_BUT_SELF, 'windEscape', 2, { value: 10, ...C })),
       ],
       6: [
         self(m('atk', 20), m('dr', 20), m('ignoreEnemyAtk', 30)), // + Agilité 35 000
-        afterSkill(st(SELF, 'shielding', 2), st(rand('enemy', 3), 'armorBreak', 2, { value: 30 })),
+        afterSkill(st(SELF, 'shielding', 2, C), st(rand('enemy', 3), 'armorBreak', 2, { value: 30 })),
       ],
     },
   },
@@ -28,8 +32,8 @@ export const ACCESSORY_SETS = [
   {
     id: 'acc-yin-yang', name: 'Accessoires Yin-Yang (nom à confirmer)',
     pairs: [
-      { id: 'force', name: 'Force', talents: [self(m('hp', 40)), attacked(100, st(rand('ally', 2), 'strong', 2, { value: 20 }))] },
-      { id: 'chakra', name: 'Chakra', talents: [self(m('finalReduction', 40)), attacked(100, st(rand('ally', 2), 'superDefense', 2, { value: 20 }))] },
+      { id: 'force', name: 'Force', talents: [self(m('hp', 40)), attacked(100, st(rand('ally', 2), 'strong', 2, { value: 20, ...C }))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('finalReduction', 40)), attacked(100, st(rand('ally', 2), 'superDefense', 2, { value: 20, ...C }))] },
       { id: 'agility', name: 'Agilité', talents: [self(m('air', 50)), attacked(35, { to: rand('enemy', 3), cleanse: 'buff' })] },
       { id: 'power', name: 'Puissance', talents: [self(m('def', 50)),
         attacked(100, debuff(role('enemy', 'assaulter'), 2, [m('crit', -30)], 'Critique −30 % (non dissipable)'))] },
