@@ -4,6 +4,7 @@
 // sinon l'attaque du porteur baisse de −net %. Non affectés par la résistance à l'ignore défense.
 // Les bonus de stats visibles à l'écran du ninja (PV, attaque, Dégâts, Absorption, défenses…) sont déjà
 // dans les stats saisies : le moteur les ignore (règle « selfStatsInPanel »). Les autres s'appliquent en combat.
+import { GEAR_SETS_2, ACCESSORY_SETS_2 } from './equipment-extra.js';
 import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, rand, role, nature, lowestHp, m, buff, debuff, st, fixed } from './ninjas/helpers.js';
 
 const self = (...mods) => ({ to: SELF, mods });
@@ -465,6 +466,9 @@ export const ACCESSORY_SETS = [
     full: [self(m('weakenAtk', 32))],
   },
 ];
+
+GEAR_SETS.push(...GEAR_SETS_2);
+ACCESSORY_SETS.push(...ACCESSORY_SETS_2);
 
 const gearById = Object.fromEntries(GEAR_SETS.map((g) => [g.id, g]));
 const accById = Object.fromEntries(ACCESSORY_SETS.map((a) => [a.id, a]));

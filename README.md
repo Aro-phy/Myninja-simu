@@ -13,7 +13,7 @@ combat au tour par tour selon la vitesse, journal détaillé et taux de victoire
 | `data.js` | Base de données : regroupe les ninjas et les équipements |
 | `ninjas/` | Fiches des ninjas par poste, depuis le wiki du jeu : `vanguards.js` (29), `assaulters.js` (60), `supporters.js` (60) ; `helpers.js` (raccourcis), `sheet-auras.js` (import du classeur « Formation ninja », plus utilisé par les fiches) |
 | `tools/import_sheet.py` | Régénère `ninjas/sheet-auras.js` depuis le classeur : `python3 tools/import_sheet.py <classeur.xlsx>` |
-| `equipment.js` | Sets d'équipement (bonus à 2/4/6 pièces) et d'accessoires (paires + bonus à 8 pièces) |
+| `equipment.js`, `equipment-extra.js` | Sets d'équipement (bonus à 2/4/6 pièces) et d'accessoires (paires + bonus à 8 pièces) |
 | `describe.js` | Retraduit une fiche en français pour vérifier la transcription |
 | `index.html`, `app.js` | Interface web |
 
