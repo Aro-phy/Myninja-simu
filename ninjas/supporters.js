@@ -2,7 +2,7 @@
 // base : ligne de base du talent (déjà comptée dans les stats saisies).
 import {
   ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, TARGET, ATTACKER, rand, role, nature, lowestHp, highestHp,
-  m, buff, debuff, st, FURY_68, FURY_50, named, gendered,
+  m, buff, debuff, st, fixed, FURY_68, FURY_50, named, gendered,
 } from './helpers.js';
 
 const S = 'supporter';
@@ -103,7 +103,7 @@ export const SUPPORTERS = [
       name: 'Truth-Seeking Pierce', hits: [oneHit(200)], fury: FURY_68,
       effects: [
         st(SELF, 'superarmor', 2),
-        debuff(role('enemy', 'supporter'), 2, [m('punch', -45), m('ccRate', -30)], 'punch −45 %, contrôle −30 %'),
+        fixed(debuff(role('enemy', 'supporter'), 2, [m('punch', -45), m('ccRate', -30)], 'punch −45 %, contrôle −30 % (non dissipable)')),
         st(ENEMIES, 'dispirited', 2, { value: 25 }),
         st(role('ally', 'assaulter'), 'shatterStorm', 2, { value: 20 }),
         dispelEnemies,

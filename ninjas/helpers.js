@@ -15,6 +15,8 @@ export const m = (stat, value, kind) => (kind ? { stat, value, kind } : { stat, 
 export const buff = (to, duration, mods, name) => ({ to, type: 'buff', duration, mods, name: name || describeMods(mods) });
 export const debuff = (to, duration, mods, name) => ({ to, type: 'debuff', duration, mods, name: name || describeMods(mods) });
 export const st = (to, status, duration, extra = {}) => ({ to, status, duration, ...extra });
+// Effet qui ne peut pas être dissipé (« cannot be dispelled »).
+export const fixed = (e) => ({ ...e, cleansable: false });
 export const FURY_68 = { self: 68, allies: 30 };
 export const FURY_50 = { self: 50, allies: 30 };
 

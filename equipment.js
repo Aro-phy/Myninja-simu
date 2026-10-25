@@ -4,7 +4,7 @@
 // sinon l'attaque du porteur baisse de −net %. Non affectés par la résistance à l'ignore défense.
 // Les bonus de stats visibles à l'écran du ninja (PV, attaque, Dégâts, Absorption, défenses…) sont déjà
 // dans les stats saisies : le moteur les ignore (règle « selfStatsInPanel »). Les autres s'appliquent en combat.
-import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, rand, role, m, buff, debuff, st } from './ninjas/helpers.js';
+import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, rand, role, nature, lowestHp, m, buff, debuff, st, fixed } from './ninjas/helpers.js';
 
 const self = (...mods) => ({ to: SELF, mods });
 const attacked = (chance, ...effects) => ({ on: 'attacked', ...(chance < 100 ? { chance } : {}), effects });
@@ -21,6 +21,34 @@ const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
 //   « Weaken enemy's DEF » / « Weaken enemy's ATK »                               → weakenDef / weakenAtk (voir plus haut)
 
 export const GEAR_SETS = [
+  {
+    id: 'gear-green', name: 'Équipement vert (nom provisoire)',
+    tiers: {
+      2: [self(m('air', 30), m('hp', 40))], // + Chakra 40 000
+      4: [
+        self(m('def', 25), m('finalReduction', 36)), // + Agilité 40 000
+        attacked(100, together(30, st(nature('enemy', 'water'), 'chaoticStorm', 2, { value: 8 }))),
+      ],
+      6: [
+        self(m('def', 25), m('air', 15), m('weakenAtk', 33)), // + Puissance 80 000
+        attacked(100, together(60, st(nature('ally', 'earth'), 'shatterStorm', 2, { value: 10, ...C }))),
+      ],
+    },
+  },
+  {
+    id: 'gear-red', name: 'Équipement rouge (nom provisoire)',
+    tiers: {
+      2: [self(m('hp', 25), m('air', 20))], // + Agilité / Chakra 25 000
+      4: [
+        self(m('ccRes', 15), m('air', 20)), // + Agilité / Chakra 35 000
+        afterSkill(fixed(debuff(role('enemy', 'assaulter'), 2, [m('dr', -25)], 'Dégâts −25 % (non dissipable)'))),
+      ],
+      6: [
+        self(m('weakenAtk', 30), m('ccRes', 20)), // + Puissance 80 000
+        afterSkill(st(ALLIES, 'windEscape', 2, { value: 10, cleansable: false })),
+      ],
+    },
+  },
   {
     id: 'gear-susano', name: 'Susano',
     tiers: {
@@ -47,7 +75,7 @@ export const GEAR_SETS = [
     },
   },
   {
-    id: 'gear-akatsuki', name: 'Équipement Akatsuki (nom à confirmer)',
+    id: 'gear-akatsuki', name: 'Équipement Akatsuki',
     tiers: {
       2: [self(m('atk', 15), m('finalDmg', 15), m('dr', 20))], // + Agilité 15 000
       4: [self(m('atk', 20), m('punch', 20), m('weakenDef', 25))], // + Agilité 20 000
@@ -86,7 +114,7 @@ export const GEAR_SETS = [
     },
   },
   {
-    id: 'gear-yin-yang', name: 'Équipement Yin-Yang (nom à confirmer)',
+    id: 'gear-yin-yang', name: 'Équipement Yin-Yang',
     tiers: {
       2: [self(m('atk', 20), m('dr', 30))], // + Agilité 25 000
       4: [
@@ -103,7 +131,41 @@ export const GEAR_SETS = [
 
 export const ACCESSORY_SETS = [
   {
-    id: 'acc-tarrasque', name: 'Accessoires Tarrasque (nom à confirmer)',
+    id: 'acc-green', name: 'Accessoires verts (nom provisoire)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('ccRes', 30), m('atk', 22), m('dr', 10))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('ccRes', 30), m('atk', 10), m('dr', 25))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('ccRes', 30), m('finalDmg', 30), m('air', 12))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('ccRes', 30), m('finalReduction', 20), m('hp', 20))] },
+    ],
+    full: [self(m('ccRes', 2), m('weakenAtk', 25), m('finalReduction', 10), m('air', 10))],
+  },
+  {
+    id: 'acc-red', name: 'Accessoires rouges (nom provisoire)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('ccRes', 30), m('atk', 30), m('air', 10))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('ccRes', 30), m('def', 30), m('dr', 25))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('ccRes', 30), m('finalDmg', 35), m('hp', 30))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('ccRes', 30), m('finalReduction', 25), m('air', 20))] },
+    ],
+    full: [self(m('ccRes', 10), m('weakenAtk', 20), m('atk', 5), m('air', 15)), attacked(100, { to: SELF, cleanse: 'debuff' })],
+  },
+  {
+    id: 'acc-gold', name: 'Accessoires dorés (nom provisoire)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('dr', 35), m('finalDmg', 20))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('atk', 30), m('dr', 25))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('finalDmg', 35)),
+        afterSkill(st({ side: 'ally', pick: 'highest-dr' }, 'strong', 2, { value: 15, ...C }))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('atk', 20), m('dr', 25), m('ccRes', 20))] },
+    ],
+    full: [
+      self(m('weakenDef', 40), m('weakenAtk', 25), m('matk', 15)),
+      afterSkill({ to: lowestHp('enemy'), penetration: 55, attackType: 'magic' }),
+    ],
+  },
+  {
+    id: 'acc-tarrasque', name: 'Accessoires Tarrasque',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('dr', 30), m('weakenDef', 30))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('atk', 30), m('weakenDef', 25))] },
@@ -113,7 +175,7 @@ export const ACCESSORY_SETS = [
     full: [self(m('dr', 25), m('finalDmg', 25), m('weakenAtk', 25))],
   },
   {
-    id: 'acc-akatsuki', name: 'Accessoires Akatsuki (nom à confirmer)',
+    id: 'acc-akatsuki', name: 'Accessoires Akatsuki',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('finalDmg', 30), m('weakenDef', 30))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('atk', 30), m('weakenDef', 25))] },
@@ -126,7 +188,7 @@ export const ACCESSORY_SETS = [
     ],
   },
   {
-    id: 'acc-baryon', name: 'Accessoires Baryon (nom à confirmer)',
+    id: 'acc-baryon', name: 'Accessoires Baryon',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('ccRes', 30), m('dr', 40))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('ccRes', 30), m('atk', 30))] },
@@ -136,7 +198,7 @@ export const ACCESSORY_SETS = [
     full: [self(m('weakenAtk', 25), m('finalDmg', 30)), afterSkill(st(rand('enemy', 3), 'painfulWill', 2))],
   },
   {
-    id: 'acc-black-feather', name: 'Accessoires Black Feather (nom à confirmer)',
+    id: 'acc-black-feather', name: 'Accessoires Black Feather',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('ccRate', 30), m('hp', 35))] }, // + Force 30 000
       { id: 'chakra', name: 'Chakra', talents: [self(m('ccRate', 30), m('air', 10))] }, // + Agilité 30 000
@@ -146,7 +208,7 @@ export const ACCESSORY_SETS = [
     full: [self(m('ccRate', 20), m('weakenAtk', 10), m('hp', 30), m('air', 20))],
   },
   {
-    id: 'acc-violet', name: 'Accessoires violets (nom à confirmer)',
+    id: 'acc-violet', name: 'Accessoires violets',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('atk', 30)), afterSkill(st(rand('enemy', 1), 'upwind', 2))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('finalDmg', 35)), afterSkill(st(rand('ally', 1), 'pyroblast', 2, C))] },
@@ -156,13 +218,13 @@ export const ACCESSORY_SETS = [
     full: [self(m('hp', 40), m('air', 30))],
   },
   {
-    id: 'acc-yin-yang', name: 'Accessoires Yin-Yang (nom à confirmer)',
+    id: 'acc-yin-yang', name: 'Accessoires Yin-Yang',
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('hp', 40)), attacked(100, st(rand('ally', 2), 'strong', 2, { value: 20, ...C }))] },
       { id: 'chakra', name: 'Chakra', talents: [self(m('finalReduction', 40)), attacked(100, st(rand('ally', 2), 'superDefense', 2, { value: 20, ...C }))] },
       { id: 'agility', name: 'Agilité', talents: [self(m('air', 50)), attacked(35, { to: rand('enemy', 3), cleanse: 'buff' })] },
       { id: 'power', name: 'Puissance', talents: [self(m('def', 50)),
-        attacked(100, debuff(role('enemy', 'assaulter'), 2, [m('crit', -30)], 'Critique −30 % (non dissipable)'))] },
+        attacked(100, fixed(debuff(role('enemy', 'assaulter'), 2, [m('crit', -30)], 'Critique −30 % (non dissipable)')))] },
     ],
     full: [self(m('weakenAtk', 32))],
   },
