@@ -179,14 +179,15 @@ function atkParts(u, type = u.attackType) {
   };
 }
 
-function defEff(att, tgt, type, rules) {
+// extraIcons : % additif en plus sur la défense (ex. « Weaken enemy's DEF » net, négatif).
+function defEff(att, tgt, type, rules, extraIcons = 0) {
   const key = type === 'magic' ? 'mdef' : 'pdef';
   const cutRes = 1 - Math.min(100, modSum(tgt, 'defCutRes')) / 100; // résistance à la réduction de défense
   const mods = [...allMods(tgt, 'def'), ...allMods(tgt, key)].map((m) => (m.value < 0 ? { ...m, value: m.value * cutRes } : m));
   return F.effectiveDefense({
     def: tgt.stats[key] || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
-    icons: mods.filter((m) => m.kind !== 'talent').reduce((a, m) => a + m.value, 0),
+    icons: mods.filter((m) => m.kind !== 'talent').reduce((a, m) => a + m.value, 0) + extraIcons,
     ignoreDef: att ? modSum(att, 'ignoreDef') : 0,
     immuneIgnoreDef: modSum(tgt, 'immuneIgnoreDef'),
     mode: rules.defenseMode,
@@ -454,8 +455,12 @@ export function simulate(teamA, teamB, opts = {}) {
     if (dk) { L('miss', `${who(tgt)} évite totalement l'attaque (${dk}).`, { attacker: att.uid }); return { hit: false, dmg: 0 }; }
     if (!roll(F.chance(stat(att, 'hit'), stat(tgt, 'dodge')))) { L('miss', `${who(att)} rate ${who(tgt)} (esquive).`, { attacker: att.uid }); return { hit: false, dmg: 0 }; }
     const a = atkParts(att, type);
-    const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') });
-    const dEff = defEff(att, tgt, type, rules);
+    // Équipements : « Weaken enemy's DEF » de l'attaquant contre « Weaken enemy's ATK » de la cible.
+    // Le plus fort l'emporte de la différence : défense de la cible baissée, ou attaque de l'attaquant baissée.
+    // Ce bonus n'est pas réduit par la résistance à l'ignore défense.
+    const weaken = modSum(att, 'weakenDef') - modSum(tgt, 'weakenAtk');
+    const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') - Math.max(0, -weaken) });
+    const dEff = defEff(att, tgt, type, rules, -Math.max(0, weaken));
     const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr'), natureDrBonus(att, tgt)]);
     const airEff = F.effectiveRate(tgt.stats.air || 0, [modSum(tgt, 'air')]);
     // (ATK - DEF) et (Dégâts - Absorption) bornés à 0 séparément : deux termes négatifs ne doivent pas donner des dégâts positifs.

@@ -12,7 +12,7 @@ const STAT = {
   immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', recovery: 'taux de soin reçu',
   recoveryCut: 'baisse du taux de soin', healCut: 'réduction de soin', penBonus: 'dégâts de pénétration', penMalus: 'résistance à la pénétration',
   pdefShield: 'bouclier de défense physique', mdefShield: 'bouclier de défense stratégique', dotBonus: 'dégâts des DoT',
-  shieldPierce: 'résistance aux boucliers de défense', sCritRes: 'résistance au s.crit', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',
+  shieldPierce: 'résistance aux boucliers de défense', weakenAtk: 'Weaken enemy\'s ATK', weakenDef: 'Weaken enemy\'s DEF', sCritRes: 'résistance au s.crit', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',
 };
 const IMMUNE_EXTRA = { furyReduction: 'réduction de fury', superDodge: 'Super Dodge (l\'ignore)', sSuperDodge: 'S-Super Dodge (l\'ignore)' };
 const PICK = {

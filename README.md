@@ -31,6 +31,7 @@ python3 -m http.server 8000
 - `node tests/roster.mjs` : chaque ninja dans des formations aléatoires.
 - `node tests/nature.mjs` : règles de nature de chakra et Chaos.
 - `node tests/void.mjs` : statut Vide (Hyakki Sasori).
+- `node tests/weaken.mjs` : « Weaken enemy's DEF » contre « Weaken enemy's ATK ».
 - `node tests/excel-compare.mjs <Damage_formula_En.xlsx> <dossier_temporaire>` : compare `formulas.js` à l'Excel
   recalculé par LibreOffice (nécessite `soffice`, Python et `openpyxl`).
 
