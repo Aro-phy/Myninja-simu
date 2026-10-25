@@ -479,7 +479,10 @@ export function simulate(teamA, teamB, opts = {}) {
     if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), -modSum(tgt, 'critDmgTaken'));
     if (block) dmg *= 1 - rules.blockReduction / 100;
     if (dmg > 0) dmg = Math.max(0, dmg - shieldAmount(att, tgt));
-    if (hasFlag(tgt, 'ignoreDirect')) {
+    if (label === 'spéciale' && hasFlag(tgt, 'voidSkill')) {
+      L('hit', `${who(tgt)} ne subit pas les dégâts de la compétence (Vide).`, { attacker: att.uid });
+      dmg = 0;
+    } else if (hasFlag(tgt, 'ignoreDirect')) {
       L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`, { attacker: att.uid });
       dmg = 0;
     } else {

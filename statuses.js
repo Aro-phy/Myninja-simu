@@ -79,7 +79,8 @@ export const STATUSES = {
   disable: other('Disable'),
   silence: other('Silence'),
   forbidFury: other('Forbid fury'),
-  void: other('Vide'),
+  // Vide (Hyakki Sasori, posé sur les ennemis) : évite les dégâts des compétences spéciales, pas ceux des attaques normales.
+  void: { name: 'Vide', type: 'debuff', cleansable: false, flags: { voidSkill: true } },
   fear: other('Fear'),
   skillForbid: { name: 'Compétence interdite', type: 'cc', cleansable: true, flags: { cc: 'seal' } },
   normalForbid: { name: 'Attaque normale interdite', type: 'cc', cleansable: true, flags: { cc: 'noNormal' } },
