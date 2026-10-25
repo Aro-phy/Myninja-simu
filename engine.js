@@ -458,7 +458,8 @@ export function simulate(teamA, teamB, opts = {}) {
     // Équipements : « Weaken enemy's DEF » de l'attaquant contre « Weaken enemy's ATK » de la cible.
     // Le plus fort l'emporte de la différence : défense de la cible baissée, ou attaque de l'attaquant baissée.
     // Ce bonus n'est pas réduit par la résistance à l'ignore défense.
-    const weaken = modSum(att, 'weakenDef') - modSum(tgt, 'weakenAtk');
+    // « Immune Weaken DEF » de la cible annule d'abord une partie du « Weaken enemy's DEF » de l'attaquant.
+    const weaken = Math.max(0, modSum(att, 'weakenDef') - modSum(tgt, 'immuneWeakenDef')) - modSum(tgt, 'weakenAtk');
     const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') - Math.max(0, -weaken) });
     const dEff = defEff(att, tgt, type, rules, -Math.max(0, weaken));
     const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr'), natureDrBonus(att, tgt)]);
