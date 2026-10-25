@@ -1,10 +1,10 @@
 import { simulate, simulateMany, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
-import { NINJAS, EQUIPMENT, SAMPLE_STATS } from './data.js';
+import { NINJAS, SAMPLE_STATS } from './data.js';
+import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, checkEquipment } from './equipment.js';
 import * as D from './describe.js';
 
 const STORE_KEY = 'myninja-sim-v3';
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
-const eqById = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
 const ROWS = [
   { key: 'V', role: 'vanguard', label: 'Avant-garde', slots: 1 },
   { key: 'A', role: 'assaulter', label: 'Attaquants', slots: 3 },
@@ -41,18 +41,18 @@ function demoState() {
   return {
     teams: [
       { name: 'Ma formation', slots: {
-        V0: { ninjaId: 'hinata-soccer', nature: 'earth', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }), equipment: [] },
+        V0: { ninjaId: 'hinata-soccer', nature: 'earth', stats: demoStats({ hp: 90e6, pdef: 14e6, mdef: 11e6 }) },
         A0: { ninjaId: 'main', stats: demoStats(), equipment: [], attackType: 'physical' },
-        A1: { ninjaId: 'sasuke-taka', nature: 'earth', stats: demoStats({ speed: 15e6 }), equipment: [] },
-        S0: { ninjaId: 'kamado-nezuko', nature: 'earth', stats: demoStats({ hp: 55e6 }), equipment: [] },
-        S1: { ninjaId: 'uchiha-sarada', nature: 'earth', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        A1: { ninjaId: 'sasuke-taka', nature: 'earth', stats: demoStats({ speed: 15e6 }) },
+        S0: { ninjaId: 'kamado-nezuko', nature: 'earth', stats: demoStats({ hp: 55e6 }) },
+        S1: { ninjaId: 'uchiha-sarada', nature: 'earth', stats: demoStats({ hp: 55e6 }) },
       } },
       { name: 'Équipe visée', slots: {
         A0: { ninjaId: 'main', stats: demoStats(), equipment: [], attackType: 'physical' },
-        A1: { ninjaId: 'eveil-de-kawaki', nature: 'thunder', stats: demoStats({ speed: 14.6e6 }), equipment: [] },
-        A2: { ninjaId: 'hashirama-madara', nature: 'thunder', stats: demoStats({ hp: 80e6 }), equipment: [] },
-        S0: { ninjaId: 'xmas-temari', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
-        S1: { ninjaId: 'natsu-dragneel', nature: 'thunder', stats: demoStats({ hp: 55e6 }), equipment: [] },
+        A1: { ninjaId: 'eveil-de-kawaki', nature: 'thunder', stats: demoStats({ speed: 14.6e6 }) },
+        A2: { ninjaId: 'hashirama-madara', nature: 'thunder', stats: demoStats({ hp: 80e6 }) },
+        S0: { ninjaId: 'xmas-temari', nature: 'thunder', stats: demoStats({ hp: 55e6 }) },
+        S1: { ninjaId: 'natsu-dragneel', nature: 'thunder', stats: demoStats({ hp: 55e6 }) },
       } },
     ],
     rules: { ...DEFAULT_RULES },
@@ -97,7 +97,7 @@ function toTeam(t) {
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
       nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
-      equipment: (m.equipment || []).map((id) => eqById[id]).filter(Boolean),
+      equipment: equipmentEntries(m.gear),
     });
   }
   return { name: t.name, members };
@@ -149,11 +149,46 @@ function kitView(n, level) {
     section(`Spéciale${kit.special?.name ? ` · ${kit.special.name}` : ''}`, D.skill(kit.special)));
 }
 
+// Choix des équipements (pièces par set) et des accessoires (paires par set), avec le détail des bonus.
+function gearView(draft) {
+  const g = draft.gear;
+  const err = el('div', { class: 'error', id: 'f-eq-err', role: 'alert' });
+  const refresh = () => { err.textContent = checkEquipment(g).join(' '); };
+  const bonusList = (entries) => el('ul', {}, entries.map((t) => el('li', {}, D.talent(t))).filter((li) => li.textContent));
+  const gearRows = GEAR_SETS.map((set) => el('div', { class: 'eq-set' },
+    el('label', { class: 'field', for: `f-g-${set.id}` }, set.name,
+      el('select', { id: `f-g-${set.id}`, onchange: (e) => { g.gear[set.id] = Number(e.target.value); refresh(); } },
+        [0, 2, 4, 6].map((n) => el('option', { value: n, selected: (g.gear[set.id] || 0) === n }, n ? `${n} pièces` : 'Aucune pièce')))),
+    el('details', {}, el('summary', {}, 'Bonus du set'),
+      ...[2, 4, 6].map((n) => el('div', {}, el('div', { class: 'note' }, `${n} pièces`), bonusList(set.tiers[n] || []))))));
+  const accRows = ACCESSORY_SETS.map((set) => el('div', { class: 'eq-set' },
+    el('div', { class: 'note' }, set.name),
+    el('div', { class: 'eq-list' }, set.pairs.map((p) => el('label', { for: `f-a-${set.id}-${p.id}` },
+      el('input', { type: 'checkbox', id: `f-a-${set.id}-${p.id}`, checked: (g.acc[set.id] || []).includes(p.id),
+        onchange: (e) => {
+          const cur = g.acc[set.id] || [];
+          g.acc[set.id] = e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id);
+          refresh();
+        } }),
+      `Paire ${p.name}`))),
+    el('details', {}, el('summary', {}, 'Bonus des paires'),
+      ...set.pairs.map((p) => el('div', {}, el('div', { class: 'note' }, `Paire ${p.name}`), bonusList(p.talents))),
+      el('div', {}, el('div', { class: 'note' }, '8 pièces (les 4 paires)'), bonusList(set.full)))));
+  return el('div', { class: 'gear' },
+    el('div', { class: 'col-label' }, 'Équipement (6 pièces au total)'), ...gearRows,
+    el('div', { class: 'col-label' }, 'Accessoires (4 paires au total)'), ...accRows,
+    el('p', { class: 'note' }, 'Les bonus de stats visibles à l\'écran du ninja sont déjà comptés dans les stats saisies : seuls les autres effets s\'appliquent en combat.'),
+    err);
+}
+
 function openEditor(ti, key) {
   const t = state.teams[ti];
   const row = ROWS.find((r) => r.key === key[0]);
   const current = t.slots[key];
-  const draft = current ? structuredClone(current) : { ninjaId: '', stats: { ...SAMPLE_STATS }, equipment: [] };
+  const draft = current ? structuredClone(current) : { ninjaId: '', stats: { ...SAMPLE_STATS } };
+  draft.gear ||= {};
+  draft.gear.gear ||= {};
+  draft.gear.acc ||= {};
   const form = $('#dlgForm');
   const options = NINJAS.filter((n) => n.role === row.role);
   const render = () => {
@@ -186,15 +221,13 @@ function openEditor(ti, key) {
       el('div', { class: 'form-grid' }, STAT_FIELDS.map(([k, lbl]) => el('label', { for: `f-${k}` }, lbl,
         el('input', { class: 'num', id: `f-${k}`, inputmode: 'decimal', value: draft.stats[k] ?? '',
           oninput: (e) => { draft.stats[k] = parseNum(e.target.value); } })))),
-      el('div', {}, el('div', { class: 'col-label' }, 'Équipements et accessoires'),
-        el('div', { class: 'eq-list' }, EQUIPMENT.map((eq) => el('label', { for: `f-eq-${eq.id}` },
-          el('input', { type: 'checkbox', id: `f-eq-${eq.id}`, checked: draft.equipment.includes(eq.id),
-            onchange: (e) => { draft.equipment = e.target.checked ? [...draft.equipment, eq.id] : draft.equipment.filter((x) => x !== eq.id); } }),
-          eq.name)))),
+      gearView(draft),
       el('div', { class: 'dlg-foot' },
         current ? el('button', { class: 'btn danger', type: 'button', onclick: () => { delete t.slots[key]; done(); } }, 'Retirer de la formation') : el('span'),
         el('button', { class: 'btn primary', type: 'button', onclick: () => {
           if (!draft.ninjaId) { $('#f-ninja').focus(); return; }
+          const eqErr = checkEquipment(draft.gear);
+          if (eqErr.length) { $('#f-eq-err').textContent = eqErr.join(' '); return; }
           if (byId[draft.ninjaId].isMain && !draft.attackType) draft.attackType = 'physical';
           t.slots[key] = draft; done();
         } }, 'Enregistrer')),

@@ -34,12 +34,6 @@ export const NINJAS = [
   },
 ];
 
-export const EQUIPMENT = [
-  { id: 'ex-ring-speed', name: 'Bague de vitesse (exemple)', passives: [{ to: 'allies', mods: [{ stat: 'speed', value: 116 }] }] },
-  { id: 'ex-pain-gear', name: 'Équipement Pain (exemple)', passives: [{ to: 'self', mods: [{ stat: 'immuneIgnoreDef', value: 20 }] }] },
-  { id: 'ex-guren-acc', name: 'Accessoire Guren (exemple)', procs: [{ on: 'any', to: { side: 'ally', pick: 'all', nature: 'water' }, status: 'bond', duration: 1, chance: 50 }] },
-  // Les équipements réels seront ajoutés ici.
-];
 
 // Statistiques d'exemple (reprises de la capture d'écran du jeu).
 export const SAMPLE_STATS = {

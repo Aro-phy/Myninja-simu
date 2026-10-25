@@ -78,6 +78,7 @@ export function effect(e) {
 export function talent(p) {
   const cond = p.cond === 'hpHigher' ? ', si ses PV sont supérieurs à ceux de l\'attaquant' : p.cond === 'hpLower' ? ', si ses PV sont inférieurs à ceux de l\'attaquant' : p.requires ? `, sous « ${p.requires} »` : '';
   if (p.on === 'attacked') return `Après avoir été attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''}${cond} : ${p.effects.map(effect).join(' ; ')}`;
+  if (p.on === 'skill') return `Après avoir lancé sa spéciale : ${p.effects.map(effect).join(' ; ')}`;
   if (p.on === 'acted') return `Après avoir attaqué${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
   if (p.on === 'death') return `À sa mort${p.effects.some((e) => e.revive) ? ' (1 fois)' : ''}${p.chance != null && p.chance < 100 ? ` (${p.chance} %)` : ''} : ${p.effects.map(effect).join(' ; ')}`;
   const parts = [];

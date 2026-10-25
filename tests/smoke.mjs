@@ -1,10 +1,10 @@
 import { simulate, simulateMany, validateTeam } from '../engine.js';
-import { NINJAS, EQUIPMENT, SAMPLE_STATS } from '../data.js';
+import { NINJAS, SAMPLE_STATS } from '../data.js';
+import { equipmentEntries } from '../equipment.js';
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
-const eq = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
-const mk = (id, pos, over = {}, equipment = []) => ({ ninja: byId[id], pos, stats: { ...SAMPLE_STATS, ...over }, equipment: equipment.map((e) => eq[e]) });
-const A = { name: 'Équipe A', members: [mk('hidan-kakuzu', 0), mk('sasuke-taka', 0), mk('kawaki', 1, {}, ['ex-ring-speed']), mk('uchiha-sarada', 0), mk('xmas-temari', 1)] };
-const B = { name: 'Équipe B', members: [mk('hinata-soccer', 0, { pdef: 9e6 }), mk('sasuke-taka', 0, { patk: 40e6 }), mk('sasuke-taka', 1), mk('uchiha-sarada', 0, {}, ['ex-guren-acc']), mk('xmas-temari', 1)] };
+const mk = (id, pos, over = {}, equipment = []) => ({ ninja: byId[id], pos, stats: { ...SAMPLE_STATS, ...over }, equipment });
+const A = { name: 'Équipe A', members: [mk('hidan-kakuzu', 0), mk('sasuke-taka', 0), mk('kawaki', 1, {}, equipmentEntries({ gear: { 'gear-yin-yang': 6 }, acc: { 'acc-yin-yang': ['force', 'chakra', 'agility', 'power'] } })), mk('uchiha-sarada', 0), mk('xmas-temari', 1)] };
+const B = { name: 'Équipe B', members: [mk('hinata-soccer', 0, { pdef: 9e6 }), mk('sasuke-taka', 0, { patk: 40e6 }), mk('sasuke-taka', 1), mk('uchiha-sarada', 0, {}, equipmentEntries({ gear: { 'gear-yin-yang': 4 } })), mk('xmas-temari', 1)] };
 console.log(validateTeam(A), validateTeam(B));
 const r = simulate(A, B, { seed: 7 });
 console.log(r.log.slice(0, 70).map((l) => l.text).join('\n'));

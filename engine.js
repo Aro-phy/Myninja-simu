@@ -317,6 +317,7 @@ export function simulate(teamA, teamB, opts = {}) {
     }
     for (const p of u.kit.talents) applyEntry(u, p, `talent ${u.ninja.name}`);
     for (const eq of u.equipment) {
+      for (const p of eq.talents || []) applyEntry(u, p, eq.name);
       for (const p of eq.passives || []) applyEntry(u, p, eq.name);
       for (const pr of eq.procs || []) u.procs.push({ ...pr, source: eq.name });
     }
@@ -633,9 +634,9 @@ export function simulate(teamA, teamB, opts = {}) {
     } else if (mode !== 'aid' || rules.aidGivesFury) {
       if (f) restore(); else changeFury(u, u, rules.normalFury);
     }
-    // déclencheurs « après avoir attaqué »
+    // déclencheurs « après avoir attaqué » (et « après une compétence spéciale »)
     if (u.alive) for (const tr of u.triggers) {
-      if (tr.on !== 'acted' || (tr.chance != null && tr.chance < 100 && !roll(tr.chance / 100))) continue;
+      if (!(tr.on === 'acted' || (tr.on === 'skill' && useSpecial)) || (tr.chance != null && tr.chance < 100 && !roll(tr.chance / 100))) continue;
       runEffects(u, tr.effects, { attacker: u, lost: ctx.lost, hit: ctx.hit });
     }
     // déclencheurs « après avoir été attaqué »
