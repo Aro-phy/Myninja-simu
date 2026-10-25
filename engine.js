@@ -373,13 +373,13 @@ export function simulate(teamA, teamB, opts = {}) {
       dot: eff.dot,
       source: src,
     };
-    // Un effet déjà présent n'est pas cumulé en valeur : on additionne sa durée.
-    const existing = tgt.effects.find((x) => x.id === e.id);
-    if (existing) {
-      if (Number.isFinite(existing.remaining) && Number.isFinite(e.remaining)) {
-        existing.remaining += e.remaining;
-        if (!silent) L('effect', `${who(tgt)} : ${name} prolongé (${existing.remaining} tour(s)).`, { target: tgt.uid });
-      } else existing.remaining = Infinity;
+    // Un effet déjà présent est remplacé par le nouveau (valeur et durée), sans cumul.
+    // Un effet permanent (talent, équipement) n'est pas remplacé par une version temporaire.
+    const idx = tgt.effects.findIndex((x) => x.id === e.id);
+    if (idx >= 0) {
+      if (!Number.isFinite(tgt.effects[idx].remaining) && Number.isFinite(e.remaining)) return true;
+      tgt.effects[idx] = e;
+      if (!silent) L('effect', `${who(tgt)} : ${name} renouvelé (${Number.isFinite(e.remaining) ? `${e.remaining} tour(s)` : 'permanent'}).`, { target: tgt.uid });
       return true;
     }
     tgt.effects.push(e);
