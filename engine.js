@@ -80,6 +80,7 @@ export function resolveKit(ninja, level) {
   const extraHits = [];
   let special = ninja.special;
   let base = ninja.base;
+  let replacedHits = null;
   for (let i = 0; i < lvl; i++) {
     const a = aw[i];
     if (a.base) base = a.base;
@@ -87,10 +88,11 @@ export function resolveKit(ninja, level) {
     awTalents.push(...(a.talents || []));
     if (a.specialEffects) extraEffects.push(...a.specialEffects);
     if (a.specialHits) extraHits.push(...a.specialHits);
+    if (a.replaceHits) replacedHits = a.replaceHits;
     if (a.special) special = a.special;
   }
-  if (special && (extraEffects.length || extraHits.length)) {
-    special = { ...special, effects: [...(special.effects || []), ...extraEffects], hits: [...skillHits(special), ...extraHits] };
+  if (special && (extraEffects.length || extraHits.length || replacedHits)) {
+    special = { ...special, effects: [...(special.effects || []), ...extraEffects], hits: [...(replacedHits || skillHits(special)), ...extraHits] };
   }
   return { talents: [...(ninja.talents || []), ...awTalents], special, normal: ninja.normal || {}, base, level: lvl };
 }
@@ -147,6 +149,7 @@ const lostPct = (u) => Math.max(0, 100 * (1 - u.hp / u.maxHp));
 function allMods(u, stat) {
   const out = [];
   for (const p of u.passives[stat] || []) {
+    if (p.hpBelow && 100 * u.hp / u.maxHp >= p.hpBelow) continue;
     const v = p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
     if (v) out.push({ value: v, kind: p.kind || 'talent' });
   }
@@ -158,7 +161,7 @@ function addPassive(u, p) { (u.passives[p.stat] ||= []).push(p); }
 function modSum(u, stat) {
   let sum = 0;
   const ps = u.passives[stat];
-  if (ps) for (const p of ps) sum += p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
+  if (ps) for (const p of ps) if (!(p.hpBelow && 100 * u.hp / u.maxHp >= p.hpBelow)) sum += p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
   for (const e of u.effects) for (const m of e.mods) if (m.stat === stat) sum += m.value;
   return sum;
 }
@@ -256,6 +259,7 @@ function resolve(sel, caster, units, rng, rules) {
     case 'highest-air': return sortBy((u) => stat(u, 'air'), -1);
     case 'highest-ccres': return sortBy((u) => stat(u, 'ccRes'), -1);
     case 'lowest-ccres': return sortBy((u) => stat(u, 'ccRes'), 1);
+    case 'lowest-ccrate': return sortBy((u) => stat(u, 'ccRate'), 1);
     case 'highest-dr': return sortBy((u) => stat(u, 'dr'), -1);
     case 'lowest-speed': return sortBy((u) => currentSpeed(u), 1);
     case 'random': {
@@ -300,7 +304,7 @@ export function simulate(teamA, teamB, opts = {}) {
     for (const t of targets) {
       for (const m of p.mods || []) {
         if (selfOnly && rules.selfStatsInPanel && PANEL_STATS.has(m.stat)) continue;
-        addPassive(t, { ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}) });
+        addPassive(t, { ...m, kind: m.kind || 'talent', source, ...(p.scale ? { scaleSrc: owner, per: p.scale } : {}), ...(p.hpBelow ? { hpBelow: p.hpBelow } : {}) });
       }
       for (const im of p.immune || []) t.immune.add(im);
       if (p.status) addStatus(owner, t, { status: p.status, value: p.value, duration: Infinity }, true);
@@ -344,7 +348,7 @@ export function simulate(teamA, teamB, opts = {}) {
     if (!tgt.alive) return false;
     const hostile = type !== 'buff';
     const say = (m) => { if (!silent) L('info', m); };
-    if (eff.status && tgt.immune.has(eff.status)) { say(`${who(tgt)} est immunisé à ${name}.`); return false; }
+    if (eff.status && (tgt.immune.has(eff.status) || tgt.effects.some((e) => e.flags?.immuneTo === eff.status))) { say(`${who(tgt)} est immunisé à ${name}.`); return false; }
     if (hostile && src && src.team !== tgt.team) {
       const dk = dodgeKind(src, tgt);
       if (dk) { say(`${who(tgt)} évite ${name} (${dk}).`); return false; }
@@ -483,7 +487,7 @@ export function simulate(teamA, teamB, opts = {}) {
         text: () => `${who(att)} → ${who(tgt)} : ${fmt(dmg)} dégâts${type !== att.attackType ? (type === 'magic' ? ' stratégiques' : ' physiques') : ''}${crit ? ' (CRITIQUE)' : ''}${block ? ' (BLOQUÉ)' : ''} → ${hpTxt(tgt)}.` });
       ctx.lost.set(tgt, (ctx.lost.get(tgt) || 0) + dmg);
     }
-    const sCrit = stat(att, 'sCrit');
+    const sCrit = stat(att, 'sCrit') - modSum(tgt, 'sCritRes');
     if (crit && sCrit > 0 && tgt.alive) {
       const d = tgt.hp * sCrit / 100;
       damage(tgt, d, att, 's.crit', { type: 'hit', extra: { attacker: att.uid, amount: d }, text: () => `S.crit : ${who(tgt)} perd ${fmt(d)} PV (${sCrit} % de ses PV actuels) → ${hpTxt(tgt)}.` });
@@ -548,7 +552,7 @@ export function simulate(teamA, teamB, opts = {}) {
       const snap = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons });
       addStatus(owner, t, { name: eff.dot.name || 'DoT', type: 'dot', duration: eff.dot.duration ?? 2,
         cleansable: !UNCLEANSABLE_DOTS.includes(eff.dot.name),
-        dot: { pct: eff.dot.pct, atk: snap * (1 + modSum(owner, 'dotBonus') / 100), attType: owner.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
+        dot: { pct: eff.dot.pct, atk: snap * (1 + (modSum(owner, 'dotBonus') + modSum(owner, `dotBonus:${eff.dot.name}`)) / 100), attType: owner.attackType, bypassBloodline: eff.dot.name === 'Sticky acid' } });
     } else if (eff.fury) {
       changeFury(owner, t, eff.fury);
       L('effect', `${who(t)} : fury ${eff.fury > 0 ? '+' : ''}${eff.fury} (${fmt(t.fury)}).`, { target: t.uid });
@@ -665,7 +669,7 @@ export function simulate(teamA, teamB, opts = {}) {
   const over = () => !alive(0) || !alive(1);
 
   function startOfTurn(u) {
-    if (hasFlag(u, 'deathSeed') && !hasFlag(u, 'deathSeedImmune')) {
+    if (hasFlag(u, 'deathSeed')) {
       u.effects = u.effects.filter((e) => !e.flags?.deathSeed);
       L('effect', `Death Seed se déclenche sur ${who(u)}.`, { target: u.uid });
       kill(u, null, 'Death Seed');

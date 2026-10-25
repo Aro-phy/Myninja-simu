@@ -312,7 +312,7 @@ export const ASSAULTERS = [
     awakenings: [{ name: 'Wedge·Absorption', talents: [{ to: named('ally', 'hashirama'), mods: [m('air', 20)] }] }],
     // La première compétence décrite est son attaque normale.
     normal: {
-      name: 'Sealed Cauldron', hits: [allHit(100)], fury: { self: 50, allies: 30 },
+      name: 'Sealed Cauldron', hits: [allHit(100)], fury: { allies: 30 }, // aucune fury pour lui
       effects: [
         pen(80),
         { to: ENEMIES, dot: { name: 'Incinerate', pct: 70, duration: 2 } },
@@ -815,7 +815,7 @@ export const ASSAULTERS = [
       immune('blind', 'sSuperDodge', 'furyReduction'),
     ],
     awakenings: [
-      { name: 'Éveil 1', talents: [self(m('dotBonus', 30))] }, // « burst rate +30 % » : appliqué à tous ses DoT
+      { name: 'Éveil 1', talents: [self(m('dotBonus:Burst', 30))] },
       { name: 'Éveil 2', talents: [allies(m('finalReduction', 15))] },
     ],
     special: {
@@ -852,6 +852,27 @@ export const ASSAULTERS = [
         either([st(lowestHp('enemy'), 'blind', 2)], [st(lowestHp('enemy'), 'imprison', 2)]),
         dispelEnemies,
         buff(ALLIES, 2, [m('reflectRes', 70)]),
+      ],
+    },
+  },
+  {
+    id: 'goku-ultra-instinct', name: 'Ultra Instinct Goku', role: A, gender: 'male', base: { speed: 80, dr: 65, air: 50 },
+    talents: [
+      allies(m('speed', 100), m('hp', 35)),
+      enemies(m('atk', -30)),
+      attacked(50, { to: ALLIES, fury: 20 }),
+      attacked(50, st(ATTACKER, 'imprison', 1)),
+      resist(50, 0),
+      immune('furyReduction', 'imprison', 'deathSeed'),
+    ],
+    special: {
+      name: 'Ultra Instinct', hits: [allHit(300), { target: lowestHp('enemy'), pct: 250 }], fury: FURY_50,
+      effects: [
+        st(rand('ally', 3), 'ccFree', 1, { chance: 80 }),
+        { to: ENEMIES, fury: -30 },
+        heal(120),
+        debuff(ENEMIES, 2, [m('def', -25, 'icon')]),
+        buff(ALLIES, 2, [m('def', 40, 'icon')]),
       ],
     },
   },

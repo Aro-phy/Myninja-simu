@@ -18,7 +18,8 @@ export const STATUSES = {
   superDodge: { name: 'Super Dodge', type: 'buff', cleansable: true, flags: { superDodge: 'superDodge' } },
   furyShield: { name: 'Fury Shield', type: 'buff', cleansable: true, value: 30, mods: (v) => [{ stat: 'finalDmg', value: v }] },
   ccFree: { name: 'Immunité CC', type: 'buff', cleansable: true, flags: { ccImmune: true } },
-  deathSeedImmune: { name: 'Immunité Death Seed', type: 'buff', cleansable: true, flags: { deathSeedImmune: true } },
+  deathSeedImmune: { name: 'Immunité Death Seed', type: 'buff', cleansable: true, flags: { immuneTo: 'deathSeed' } },
+  stunImmune: { name: 'Immunité Stun', type: 'buff', cleansable: true, flags: { immuneTo: 'stun' } },
 
   // --- Buffs non dissipables ---
   sSuperDodge: { name: 'S-Super Dodge', type: 'buff', cleansable: false, flags: { superDodge: 'sSuperDodge' } },
@@ -80,6 +81,7 @@ export const STATUSES = {
   forbidFury: other('Forbid fury'),
   void: other('Vide'),
   fear: other('Fear'),
+  skillForbid: { name: 'Compétence interdite', type: 'cc', cleansable: true, flags: { cc: 'seal' } },
   normalForbid: { name: 'Attaque normale interdite', type: 'cc', cleansable: true, flags: { cc: 'noNormal' } },
   collapse: other('Effondrement'),
   // Emprisonnement des âmes (Hyakki Sasori, posé sur ses alliés) : pas de gain de fury, +15 % contrôle et résistance.

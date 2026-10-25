@@ -12,12 +12,13 @@ const STAT = {
   immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', recovery: 'taux de soin reçu',
   recoveryCut: 'baisse du taux de soin', healCut: 'réduction de soin', penBonus: 'dégâts de pénétration', penMalus: 'résistance à la pénétration',
   pdefShield: 'bouclier de défense physique', mdefShield: 'bouclier de défense stratégique', dotBonus: 'dégâts des DoT',
-  shieldPierce: 'résistance aux boucliers de défense', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',
+  shieldPierce: 'résistance aux boucliers de défense', sCritRes: 'résistance au s.crit', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',
 };
 const IMMUNE_EXTRA = { furyReduction: 'réduction de fury', superDodge: 'Super Dodge (l\'ignore)', sSuperDodge: 'S-Super Dodge (l\'ignore)' };
 const PICK = {
   'lowest-hp': 'le moins de PV', 'highest-hp': 'le plus de PV', 'lowest-hp-pct': 'le plus faible % de PV', 'highest-atk': 'la plus forte attaque',
-  'highest-speed': 'le plus rapide', 'highest-air': 'la plus forte Absorption', 'highest-ccres': 'la plus forte résistance au contrôle',
+  'highest-speed': 'le plus rapide', 'lowest-speed': 'le plus lent', 'lowest-ccres': 'la plus faible résistance au contrôle',
+  'lowest-ccrate': 'le plus faible taux de contrôle', 'highest-dr': 'le plus de Dégâts', 'highest-air': 'la plus forte Absorption', 'highest-ccres': 'la plus forte résistance au contrôle',
 };
 // « de les alliés » → « des alliés », « de le » → « du »
 const de = (s) => (s.startsWith('les ') ? `des ${s.slice(4)}` : s.startsWith('tous ') || s.startsWith('2 ') ? `de ${s}` : s.startsWith('le ') ? `du ${s.slice(3)}` : `de ${s}`);
@@ -48,7 +49,8 @@ export function target(t) {
   return s;
 }
 
-const mods = (ms) => ms.map((x) => `${STAT[x.stat] || x.stat} ${x.value > 0 ? '+' : ''}${x.value} %${x.kind === 'icon' ? '' : ''}`).join(', ');
+const statName = (k) => STAT[k] || (k.startsWith('dotBonus:') ? `dégâts de ${k.slice(9)}` : k);
+const mods = (ms) => ms.map((x) => `${statName(x.stat)} ${x.value > 0 ? '+' : ''}${x.value} %${x.kind === 'icon' ? '' : ''}`).join(', ');
 
 export function effect(e) {
   const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
@@ -83,7 +85,7 @@ export function talent(p) {
     const selfFixed = (p.to || 'self') === 'self' && !p.scale;
     const inPanel = selfFixed ? p.mods.filter((x) => PANEL_STATS.has(x.stat)) : [];
     const applied = p.mods.filter((x) => !inPanel.includes(x));
-    if (applied.length) parts.push(`${target(p.to || 'self')} : ${mods(applied)}${p.scale ? ` par tranche de ${p.scale} % de PV perdus` : ''}`);
+    if (applied.length) parts.push(`${target(p.to || 'self')} : ${mods(applied)}${p.scale ? ` par tranche de ${p.scale} % de PV perdus` : ''}${p.hpBelow ? ` (tant que ses PV sont sous ${p.hpBelow} %)` : ''}`);
     if (inPanel.length) parts.push(`lui-même : ${mods(inPanel)} (déjà compté dans les stats saisies)`);
   }
   if (p.immune?.length) parts.push(`Immunisé : ${p.immune.map((i) => IMMUNE_EXTRA[i] || STATUSES[i]?.name || i).join(', ')}`);
