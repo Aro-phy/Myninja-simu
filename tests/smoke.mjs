@@ -1,0 +1,14 @@
+import { simulate, simulateMany, validateTeam } from '../engine.js';
+import { NINJAS, EQUIPMENT, SAMPLE_STATS } from '../data.js';
+const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
+const eq = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
+const mk = (id, pos, over = {}, equipment = []) => ({ ninja: byId[id], pos, stats: { ...SAMPLE_STATS, ...over }, equipment: equipment.map((e) => eq[e]) });
+const A = { name: 'Équipe A', members: [mk('ex-vanguard', 0), mk('ex-assaulter', 0), mk('ex-assassin', 1, {}, ['ex-ring-speed']), mk('ex-healer', 0), mk('ex-controller', 1)] };
+const B = { name: 'Équipe B', members: [mk('ex-vanguard', 0, { pdef: 9e6 }), mk('ex-assaulter', 0, { patk: 40e6 }), mk('ex-assaulter', 1), mk('ex-healer', 0, {}, ['ex-guren-acc']), mk('ex-controller', 1)] };
+console.log(validateTeam(A), validateTeam(B));
+const r = simulate(A, B, { seed: 7 });
+console.log(r.log.slice(0, 70).map((l) => l.text).join('\n'));
+console.log('...\n' + r.log.slice(-4).map((l) => l.text).join('\n'));
+console.time('1000 combats');
+console.log(simulateMany(A, B, 1000));
+console.timeEnd('1000 combats');
