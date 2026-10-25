@@ -15,9 +15,9 @@ const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
 // Vocabulaire des descriptions :
 //   « Decrease the success rate of enemy's control skills » / « Decrease CC Rate » → résistance au contrôle (ccRes)
 //   « Increase the success rate of control skills » / « Increase CC Rate »        → taux de contrôle (ccRate)
-//   « Bonus damage after attack »                                                  → dégâts finaux (finalDmg), à confirmer
-//   « Damage taken reduction »                                                     → dégâts totaux reçus (dmgTaken négatif)
-//   « Weaken enemy's DEF »                                                         → ignore défense (ignoreDef)
+//   « Bonus damage after attack »                                                  → dégâts finaux (finalDmg)
+//   « Damage taken reduction »                                                     → réduction des dégâts finaux (finalReduction)
+//   « Weaken enemy's DEF »  → baisse de X % la défense des ennemis frappés, tout le combat (ignoreDef de l'Excel)
 
 export const GEAR_SETS = [
   {
@@ -43,7 +43,7 @@ export const GEAR_SETS = [
         afterSkill({ to: ALLIES, heal: 40, attackType: 'physical' }),
       ],
       6: [
-        self(m('ccRate', 15), m('ignoreEnemyAtk', 33), m('dmgTaken', -40)), // + Agilité 35 000
+        self(m('ccRate', 15), m('ignoreEnemyAtk', 33), m('finalReduction', 40)), // + Agilité 35 000
         afterSkill(together(35, st(rand('ally', 2), 'shielding', 2, C))),
       ],
     },
@@ -80,7 +80,7 @@ export const ACCESSORY_SETS = [
     pairs: [
       { id: 'force', name: 'Force', talents: [self(m('ccRate', 30), m('hp', 35))] }, // + Force 30 000
       { id: 'chakra', name: 'Chakra', talents: [self(m('ccRate', 30), m('air', 10))] }, // + Agilité 30 000
-      { id: 'agility', name: 'Agilité', talents: [self(m('dmgTaken', -35)), afterSkill(st(rand('ally', 1), 'shatterStorm', 2, C))] }, // + Chakra 30 000
+      { id: 'agility', name: 'Agilité', talents: [self(m('finalReduction', 35)), afterSkill(st(rand('ally', 1), 'shatterStorm', 2, C))] }, // + Chakra 30 000
       { id: 'power', name: 'Puissance', talents: [self(m('ccRate', 30), m('ignoreEnemyAtk', 15))] }, // + Puissance 30 000
     ],
     full: [self(m('ccRate', 20), m('ignoreEnemyAtk', 10), m('hp', 30), m('air', 20))],
