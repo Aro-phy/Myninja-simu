@@ -27,6 +27,22 @@ export const PANEL_STATS = new Set(['hp', 'atk', 'patk', 'matk', 'def', 'pdef', 
 const ROW_ORDER = ['V', 'A', 'S'];
 export const ROLE_LABEL = { vanguard: 'Avant-garde', assaulter: 'Attaquant', supporter: 'Support' };
 export const NATURES = { none: 'Non activé', earth: 'Terre', fire: 'Feu', thunder: 'Foudre', water: 'Eau', wind: 'Vent' };
+// Nature de chakra : X contre Y (X attaque Y avec +Dégâts, Y attaque X avec -Dégâts), X renforce les alliés Y.
+export const COUNTERS = { water: 'fire', fire: 'wind', wind: 'thunder', thunder: 'earth', earth: 'water' };
+export const BOOSTS = { water: 'thunder', fire: 'earth', thunder: 'fire', wind: 'water', earth: 'wind' };
+// Bonus / malus de Dégâts selon l'écart de niveau (mon niveau - niveau adverse), tableau de la communauté.
+const COUNTER_UP = [25, 27, 29, 31, 33, 36, 39, 42, 45, 50, 51, 52, 53, 54, 55];
+const COUNTERED_DOWN = [25, 23, 21, 19, 17, 15, 13, 11, 9, 7, 6, 5, 4, 3, 2];
+export const NATURE_BOOST = { hp: 11, atk: 1 }; // niveau 1 (valeurs des niveaux supérieurs inconnues)
+
+// Bonus de Dégâts (en points de %) quand `att` frappe `tgt` selon leurs natures.
+export function natureDrBonus(att, tgt) {
+  if (att.nature === 'none' || tgt.nature === 'none') return 0;
+  const d = (att.natureLevel || 1) - (tgt.natureLevel || 1);
+  if (COUNTERS[att.nature] === tgt.nature) return d >= 0 ? COUNTER_UP[Math.min(d, 14)] : Math.max(0, 25 + d);
+  if (COUNTERS[tgt.nature] === att.nature) return d >= 0 ? -COUNTERED_DOWN[Math.min(d, 14)] : -25;
+  return 0;
+}
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -98,6 +114,7 @@ function makeUnit(member, team, index) {
     name: member.label || n.name,
     role: n.role,
     nature: member.nature || n.nature || 'none',
+    natureLevel: member.natureLevel || 1,
     tags: n.tags || [],
     attackType: member.attackType || n.attackType || (n.role === 'supporter' ? 'magic' : 'physical'),
     row: ROWS[n.role],
@@ -264,6 +281,14 @@ export function simulate(teamA, teamB, opts = {}) {
       for (const pr of eq.procs || []) u.procs.push({ ...pr, source: eq.name });
     }
   }
+  // Renforcement de nature : un allié de nature X renforce les alliés de nature BOOSTS[X] (non cumulable).
+  for (const u of units) {
+    if (u.nature === 'none') continue;
+    if (units.some((a) => a.team === u.team && a !== u && BOOSTS[a.nature] === u.nature)) {
+      u.passives.push({ stat: 'hp', value: NATURE_BOOST.hp, kind: 'talent', source: 'nature' },
+        { stat: 'atk', value: NATURE_BOOST.atk, kind: 'talent', source: 'nature' });
+    }
+  }
   for (const u of units) {
     u.maxHp = (u.stats.hp || 1) * (1 + modSum(u, 'hp') / 100);
     u.hp = u.maxHp;
@@ -384,7 +409,7 @@ export function simulate(teamA, teamB, opts = {}) {
     const a = atkParts(att, type);
     const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') });
     const dEff = defEff(att, tgt, type, rules);
-    const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr')]);
+    const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr'), natureDrBonus(att, tgt)]);
     const airEff = F.effectiveRate(tgt.stats.air || 0, [modSum(tgt, 'air')]);
     // (ATK - DEF) et (Dégâts - Absorption) bornés à 0 séparément : deux termes négatifs ne doivent pas donner des dégâts positifs.
     const base = atkEff <= dEff || drEff <= airEff ? 0 : F.hitDamage({
@@ -613,8 +638,13 @@ export function simulate(teamA, teamB, opts = {}) {
     startOfTurn(u);
     if (u.alive && !over()) {
       const hard = u.effects.find((e) => e.flags?.cc === 'hard');
-      if (hard) L('info', `${who(u)} est sous ${hard.name} et ne peut pas agir.`, { actor: u.uid });
-      else {
+      if (hard) {
+        L('info', `${who(u)} est sous ${hard.name} et ne peut pas agir.`, { actor: u.uid });
+        if (u.effects.some((e) => e.flags?.chaos)) {
+          L('action', `${who(u)} est sous Chaos et s'attaque lui-même.`, { actor: u.uid });
+          strike(u, u, 100, 1, 'Chaos', u.attackType, { hit: [], lost: new Map() });
+        }
+      } else {
         act(u, 'main');
         if (!over()) maybeAid(u);
         if (!over() && u.alive && roll(extraTurnChance(u) / 100)) {

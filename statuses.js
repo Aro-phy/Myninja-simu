@@ -9,7 +9,9 @@
 //   ignoreDef, immuneIgnoreDef, ignoreEnemyAtk, recovery, recoveryCut, healCut,
 //   penBonus, penMalus, penMultiplier, bloodline
 
+// CC du wiki : non dissipables. CC absents du wiki : empêchent d'agir et sont dissipables.
 const hard = (name) => ({ name, type: 'cc', cleansable: false, flags: { cc: 'hard' } });
+const other = (name, flags = {}) => ({ name, type: 'cc', cleansable: true, flags: { cc: 'hard', ...flags } });
 
 export const STATUSES = {
   // --- Buffs dissipables ---
@@ -63,17 +65,17 @@ export const STATUSES = {
   freeze: hard('Freeze'),
   windBound: hard('Wind Bound'),
   charm: hard('Charm'),
-  chaos: hard('Chaos'),
-  stun: hard('Stun'),
-  shock: hard('Shock'),
-  acupoint: hard('Acupoint'),
-  paralysis: hard('Paralysis'),
-  petrify: hard('Petrify'),
-  expel: hard('Expel'),
-  disable: hard('Disable'),
-  seal: { name: 'Seal', type: 'cc', cleansable: false, flags: { cc: 'seal' } },       // bloque seulement la spéciale
-  silence: { name: 'Silence', type: 'cc', cleansable: false, flags: { cc: 'seal' } }, // supposé identique à Seal
-  forbidFury: { name: 'Interdiction de fury', type: 'cc', cleansable: false, flags: { noFury: true } },
+  seal: { name: 'Seal', type: 'cc', cleansable: false, flags: { cc: 'seal' } }, // bloque seulement la spéciale
+  chaos: other('Chaos', { chaos: true }), // en plus, à son tour, le ninja fait une attaque normale contre lui-même
+  stun: other('Stun'),
+  shock: other('Shock'),
+  acupoint: other('Acupoint'),
+  paralysis: other('Paralysis'),
+  petrify: other('Petrify'),
+  expel: other('Expel'),
+  disable: other('Disable'),
+  silence: other('Silence'),
+  forbidFury: other('Forbid fury'),
 
   // --- Buff / debuff générique : modificateurs libres ---
   customBuff: { name: 'Buff', type: 'buff', cleansable: true },

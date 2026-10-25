@@ -96,7 +96,7 @@ function toTeam(t) {
     members.push({
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
-      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', awakening: m.awakening,
+      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
       equipment: (m.equipment || []).map((id) => eqById[id]).filter(Boolean),
     });
   }
@@ -124,7 +124,7 @@ function renderTeam(ti) {
       const btn = el('button', { class: `slot${n ? ' filled' : ''}`, type: 'button', id: `slot-${ti}-${key}`,
         'aria-label': n ? `Modifier ${n.name}` : `Ajouter un ninja (${row.label})`, onclick: () => openEditor(ti, key) },
       n ? [el('span', { class: 'nm' }, m.label || n.name),
-        el('span', { class: 'st' }, `${n.isMain ? 'Principal' : NATURES[m.nature || 'none']} · PV ${short(m.stats.hp || 0)}`)]
+        el('span', { class: 'st' }, `${n.isMain ? 'Principal' : `${NATURES[m.nature || 'none']}${m.nature && m.nature !== 'none' ? ` niv. ${m.natureLevel || 1}` : ''}`} · PV ${short(m.stats.hp || 0)}`)]
         : el('span', { class: 'empty' }, '+ Ajouter'));
       col.append(btn);
     }
@@ -170,6 +170,9 @@ function openEditor(ti, key) {
         n.isMain ? null : el('label', { class: 'field', for: 'f-nature' }, 'Nature de chakra',
           el('select', { id: 'f-nature', onchange: (e) => { draft.nature = e.target.value; } },
             Object.entries(NATURES).map(([k, v]) => el('option', { value: k, selected: (draft.nature || 'none') === k }, v)))),
+        n.isMain ? null : el('label', { class: 'field', for: 'f-nlvl' }, 'Niveau de nature',
+          el('input', { type: 'number', id: 'f-nlvl', min: 1, max: 30, value: draft.natureLevel || 1,
+            oninput: (e) => { draft.natureLevel = Math.max(1, Math.round(parseNum(e.target.value))); } })),
         n.awakenings?.length ? el('label', { class: 'field', for: 'f-aw' }, 'Niveau d\'éveil',
           el('select', { id: 'f-aw', onchange: (e) => { draft.awakening = Number(e.target.value); render(); } },
             Array.from({ length: n.awakenings.length + 1 }, (_, i) => el('option', { value: i, selected: (draft.awakening ?? n.awakenings.length) === i }, i === 0 ? 'Aucun' : `${i} · ${n.awakenings[i - 1].name}`)))) : null) : null,
