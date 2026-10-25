@@ -10,8 +10,44 @@ const attacked = (chance, ...effects) => ({ on: 'attacked', ...(chance < 100 ? {
 const afterSkill = (...effects) => ({ on: 'skill', effects });
 // Les buffs posés par un équipement ou un accessoire sont dissipables (sauf mention contraire).
 const C = { cleansable: true };
+// Un seul tirage pour tout le groupe (« X % de chance de faire entrer 2 ... »).
+const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
+// Vocabulaire des descriptions :
+//   « Decrease the success rate of enemy's control skills » / « Decrease CC Rate » → résistance au contrôle (ccRes)
+//   « Increase the success rate of control skills » / « Increase CC Rate »        → taux de contrôle (ccRate)
+//   « Bonus damage after attack »                                                  → dégâts finaux (finalDmg), à confirmer
+//   « Damage taken reduction »                                                     → dégâts totaux reçus (dmgTaken négatif)
+//   « Weaken enemy's DEF »                                                         → ignore défense (ignoreDef)
 
 export const GEAR_SETS = [
+  {
+    id: 'gear-baryon', name: 'Baryon',
+    tiers: {
+      2: [self(m('atk', 20), m('dr', 20))], // + Agilité / Force 25 000
+      4: [
+        self(m('finalDmg', 20), m('ignoreEnemyAtk', 30)), // + Agilité / Force 35 000
+        afterSkill(st(rand('ally', 1), 'superarmor', 2, { chance: 50, ...C })),
+      ],
+      6: [
+        self(m('atk', 20), m('ccRes', 25), m('dr', 10), m('finalDmg', 10)),
+        afterSkill(together(75, st(rand('enemy', 2), 'chaoticStorm', 2))),
+      ],
+    },
+  },
+  {
+    id: 'gear-black-feather', name: 'Black Feather',
+    tiers: {
+      2: [self(m('hp', 30), m('punch', 30), m('air', 30))],
+      4: [
+        self(m('ccRate', 40), m('hp', 30)), // + Agilité 25 000
+        afterSkill({ to: ALLIES, heal: 40, attackType: 'physical' }),
+      ],
+      6: [
+        self(m('ccRate', 15), m('ignoreEnemyAtk', 33), m('dmgTaken', -40)), // + Agilité 35 000
+        afterSkill(together(35, st(rand('ally', 2), 'shielding', 2, C))),
+      ],
+    },
+  },
   {
     id: 'gear-yin-yang', name: 'Équipement Yin-Yang (nom à confirmer)',
     tiers: {
@@ -29,6 +65,36 @@ export const GEAR_SETS = [
 ];
 
 export const ACCESSORY_SETS = [
+  {
+    id: 'acc-baryon', name: 'Accessoires Baryon (nom à confirmer)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('ccRes', 30), m('dr', 40))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('ccRes', 30), m('atk', 30))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('ccRes', 30), m('ignoreDef', 45), m('atk', 10))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('ccRes', 20), m('dr', 50))] },
+    ],
+    full: [self(m('ignoreEnemyAtk', 25), m('finalDmg', 30)), afterSkill(st(rand('enemy', 3), 'painfulWill', 2))],
+  },
+  {
+    id: 'acc-black-feather', name: 'Accessoires Black Feather (nom à confirmer)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('ccRate', 30), m('hp', 35))] }, // + Force 30 000
+      { id: 'chakra', name: 'Chakra', talents: [self(m('ccRate', 30), m('air', 10))] }, // + Agilité 30 000
+      { id: 'agility', name: 'Agilité', talents: [self(m('dmgTaken', -35)), afterSkill(st(rand('ally', 1), 'shatterStorm', 2, C))] }, // + Chakra 30 000
+      { id: 'power', name: 'Puissance', talents: [self(m('ccRate', 30), m('ignoreEnemyAtk', 15))] }, // + Puissance 30 000
+    ],
+    full: [self(m('ccRate', 20), m('ignoreEnemyAtk', 10), m('hp', 30), m('air', 20))],
+  },
+  {
+    id: 'acc-violet', name: 'Accessoires violets (nom à confirmer)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('atk', 30)), afterSkill(st(rand('enemy', 1), 'upwind', 2))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('finalDmg', 35)), afterSkill(st(rand('ally', 1), 'pyroblast', 2, C))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('dr', 35)), afterSkill(st(rand('ally', 1), 'superarmor', 2, C))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('ignoreEnemyAtk', 25)), afterSkill(st(rand('enemy', 1), 'corrosion', 2))] },
+    ],
+    full: [self(m('hp', 40), m('air', 30))],
+  },
   {
     id: 'acc-yin-yang', name: 'Accessoires Yin-Yang (nom à confirmer)',
     pairs: [

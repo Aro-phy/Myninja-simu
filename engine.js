@@ -417,10 +417,10 @@ export function simulate(teamA, teamB, opts = {}) {
     if (tgt.hp <= 0) kill(tgt, src, kind);
   }
 
-  function heal(src, tgt, pctHeal) {
+  function heal(src, tgt, pctHeal, type) {
     if (!tgt.alive) return;
     if (hasFlag(tgt, 'noHeal')) { L('info', `${who(tgt)} ne peut pas être soigné.`); return; }
-    const a = atkParts(src);
+    const a = atkParts(src, type || src.attackType);
     const amount = F.healAmount({
       atkTalentOnly: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
       atkDebuffIcon: a.negIcons,
@@ -538,7 +538,7 @@ export function simulate(teamA, teamB, opts = {}) {
   function applyOne(owner, t, eff, ctx) {
     if (eff.strike) strike(owner, t, eff.strike, 1, 'coup', eff.attackType || owner.attackType, { hit: [], lost: new Map() });
     else if (eff.hot) addStatus(owner, t, { name: `Soin continu ${eff.hot} %`, type: 'buff', duration: eff.duration ?? 2, cleansable: true, flags: { hot: eff.hot } });
-    else if (eff.heal) heal(owner, t, eff.heal);
+    else if (eff.heal) heal(owner, t, eff.heal, eff.attackType);
     else if (eff.penetration) {
       const dk = dodgeKind(owner, t);
       if (dk) { L('miss', `${who(t)} évite la pénétration (${dk}).`); return; }

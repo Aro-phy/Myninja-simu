@@ -56,6 +56,7 @@ export function effect(e) {
   const ch = e.chance != null && e.chance < 100 ? `${e.chance} % de chance : ` : '';
   const to = target(e.to);
   const dur = e.duration === Infinity ? ' (permanent)' : e.duration ? ` pendant ${e.duration} tour${e.duration > 1 ? 's' : ''}` : '';
+  if (e.oneOf && e.oneOf.length === 1) return `${ch}${e.oneOf[0].map(effect).join(' + ')}`;
   if (e.oneOf) return `${ch}un seul au hasard${e.weights ? ` (${e.weights.join(' / ')} %)` : ''} : ${e.oneOf.map((g) => g.map(effect).join(' + ')).join(' OU ')}`;
   if (e.strike) return `${ch}inflige ${e.strike} % de dégâts${e.attackType === 'physical' ? ' physiques' : e.attackType === 'magic' ? ' stratégiques' : ''} à ${to}`;
   if (e.hot) return `${ch}soin continu (taux ${e.hot} %) sur ${to}${dur}`;
