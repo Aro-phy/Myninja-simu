@@ -22,7 +22,7 @@ const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
 
 export const GEAR_SETS = [
   {
-    id: 'gear-gold', name: 'Équipement doré (nom à confirmer)',
+    id: 'gear-susano', name: 'Susano',
     tiers: {
       2: [self(m('hp', 35), m('punch', 30), m('def', 30))],
       4: [
