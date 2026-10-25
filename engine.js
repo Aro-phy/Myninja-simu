@@ -257,6 +257,7 @@ function resolve(sel, caster, units, rng, rules) {
     case 'highest-atk': return sortBy((u) => atkParts(u).atk, -1);
     case 'highest-speed': return sortBy((u) => currentSpeed(u), -1);
     case 'highest-air': return sortBy((u) => stat(u, 'air'), -1);
+    case 'lowest-air': return sortBy((u) => stat(u, 'air'), 1);
     case 'highest-ccres': return sortBy((u) => stat(u, 'ccRes'), -1);
     case 'lowest-ccres': return sortBy((u) => stat(u, 'ccRes'), 1);
     case 'lowest-ccrate': return sortBy((u) => stat(u, 'ccRate'), 1);

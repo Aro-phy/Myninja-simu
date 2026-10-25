@@ -21,6 +21,42 @@ const together = (chance, ...effects) => ({ chance, oneOf: [effects] });
 
 export const GEAR_SETS = [
   {
+    id: 'gear-gold', name: 'Équipement doré (nom à confirmer)',
+    tiers: {
+      2: [self(m('hp', 35), m('punch', 30), m('def', 30))],
+      4: [
+        self(m('ccRate', 40), m('air', 30)), // + Agilité 30 000
+        afterSkill(st(rand('enemy', 1), 'untreatment', 2)),
+      ],
+      6: [
+        self(m('ccRate', 15), m('ignoreEnemyAtk', 33), m('finalReduction', 35)), // + Agilité 40 000
+        afterSkill(st(role('ally', 'supporter'), 'shatterStorm', 2, { value: 10, ...C }), { to: role('ally', 'supporter'), heal: 40 }),
+      ],
+    },
+  },
+  {
+    id: 'gear-tarrasque', name: 'Tarrasque',
+    tiers: {
+      2: [self(m('dr', 40)), afterSkill(debuff(ENEMIES, 2, [m('air', -30)]))],
+      4: [self(m('atk', 30)), afterSkill(st(rand('enemy', 1), 'upwind', 2))], // + Agilité 25 000
+      6: [
+        self(m('ignoreEnemyAtk', 30), m('ignoreDef', 35)), // + Agilité 30 000
+        afterSkill(together(60, st(role('ally', 'assaulter'), 'acceleration', 2, { value: 15, cleansable: false }))),
+      ],
+    },
+  },
+  {
+    id: 'gear-akatsuki', name: 'Équipement Akatsuki (nom à confirmer)',
+    tiers: {
+      2: [self(m('atk', 15), m('finalDmg', 15), m('dr', 20))], // + Agilité 15 000
+      4: [self(m('atk', 20), m('punch', 20), m('ignoreDef', 25))], // + Agilité 20 000
+      6: [
+        self(m('atk', 15), m('ignoreEnemyAtk', 30), m('dr', 30)), // + Agilité 25 000
+        afterSkill({ to: ENEMIES, penetration: 50, attackType: 'physical' }),
+      ],
+    },
+  },
+  {
     id: 'gear-baryon', name: 'Baryon',
     tiers: {
       2: [self(m('atk', 20), m('dr', 20))], // + Agilité / Force 25 000
@@ -65,6 +101,29 @@ export const GEAR_SETS = [
 ];
 
 export const ACCESSORY_SETS = [
+  {
+    id: 'acc-tarrasque', name: 'Accessoires Tarrasque (nom à confirmer)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('dr', 30), m('ignoreDef', 30))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('atk', 30), m('ignoreDef', 25))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('finalDmg', 30), m('ignoreDef', 30))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('atk', 30), m('ignoreDef', 25))] },
+    ],
+    full: [self(m('dr', 25), m('finalDmg', 25), m('ignoreEnemyAtk', 25))],
+  },
+  {
+    id: 'acc-akatsuki', name: 'Accessoires Akatsuki (nom à confirmer)',
+    pairs: [
+      { id: 'force', name: 'Force', talents: [self(m('finalDmg', 30), m('ignoreDef', 30))] },
+      { id: 'chakra', name: 'Chakra', talents: [self(m('atk', 30), m('ignoreDef', 25))] },
+      { id: 'agility', name: 'Agilité', talents: [self(m('dr', 30), m('ignoreDef', 30))] },
+      { id: 'power', name: 'Puissance', talents: [self(m('atk', 20), m('dr', 30), m('punch', 15))] },
+    ],
+    full: [
+      self(m('finalDmg', 30), m('ignoreEnemyAtk', 25), m('patk', 15)),
+      afterSkill({ to: { side: 'enemy', pick: 'lowest-air' }, strike: 60, attackType: 'physical' }),
+    ],
+  },
   {
     id: 'acc-baryon', name: 'Accessoires Baryon (nom à confirmer)',
     pairs: [

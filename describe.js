@@ -18,7 +18,7 @@ const IMMUNE_EXTRA = { furyReduction: 'réduction de fury', superDodge: 'Super D
 const PICK = {
   'lowest-hp': 'le moins de PV', 'highest-hp': 'le plus de PV', 'lowest-hp-pct': 'le plus faible % de PV', 'highest-atk': 'la plus forte attaque',
   'highest-speed': 'le plus rapide', 'lowest-speed': 'le plus lent', 'lowest-ccres': 'la plus faible résistance au contrôle',
-  'lowest-ccrate': 'le plus faible taux de contrôle', 'highest-dr': 'le plus de Dégâts', 'highest-air': 'la plus forte Absorption', 'highest-ccres': 'la plus forte résistance au contrôle',
+  'lowest-ccrate': 'le plus faible taux de contrôle', 'highest-dr': 'le plus de Dégâts', 'highest-air': 'la plus forte Absorption', 'lowest-air': 'la plus faible Absorption', 'highest-ccres': 'la plus forte résistance au contrôle',
 };
 // « de les alliés » → « des alliés », « de le » → « du »
 const de = (s) => (s.startsWith('les ') ? `des ${s.slice(4)}` : s.startsWith('tous ') || s.startsWith('2 ') ? `de ${s}` : s.startsWith('le ') ? `du ${s.slice(3)}` : `de ${s}`);
