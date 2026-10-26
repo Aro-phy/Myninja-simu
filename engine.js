@@ -113,9 +113,17 @@ function skillHits(skill, rng) {
 
 // ---------- Création des unités ----------
 
+// Talents du personnage principal : ils dépendent des choix du joueur, saisis dans la formation.
+// mainTalents : [{ side: 'ally' | 'enemy', stat, value }] → bonus permanent sur tous les alliés ou tous les ennemis.
+function mainTalentEntries(list = []) {
+  return list.filter((t) => t && t.stat && t.value)
+    .map((t) => ({ to: { side: t.side === 'enemy' ? 'enemy' : 'ally', pick: 'all' }, mods: [{ stat: t.stat, value: t.value }] }));
+}
+
 function makeUnit(member, team, index) {
   const n = member.ninja;
-  const kit = resolveKit(n, member.awakening);
+  let kit = resolveKit(n, member.awakening);
+  if (n.isMain && member.mainTalents?.length) kit = { ...kit, talents: [...kit.talents, ...mainTalentEntries(member.mainTalents)] };
   return {
     uid: `${team}-${index}`,
     team,

@@ -129,6 +129,11 @@ dialog::backdrop { background: rgb(10 14 24 / 0.55); }
 .eq-list { display: grid; gap: 4px; }
 .eq-list label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .skill-desc { font-size: 13px; color: var(--muted); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.main-talents { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0; }
+.main-talents legend { font-size: 12px; font-weight: 700; color: var(--ink); padding: 0 4px; }
+.main-talents .hint { margin: 0; font-size: 12px; color: var(--muted); }
+.mt-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 70px auto auto; gap: 6px; align-items: center; }
+.mt-row input { min-width: 0; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 12px; }
 .skill-desc summary { cursor: pointer; font-weight: 700; color: var(--ink); }
 .kit { display: grid; gap: 10px; margin-top: 10px; }

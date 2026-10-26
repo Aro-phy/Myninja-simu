@@ -109,6 +109,7 @@ function toTeam(t) {
     members.push({
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
+      mainTalents: byId[m.ninjaId].isMain ? m.mainTalents : undefined,
       nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
       equipment: equipmentEntries(slotsToChoice(m.equip || choiceToSlots(m.gear))),
     });
@@ -397,6 +398,7 @@ function openEditor(ti, key) {
         el('select', { id: 'f-type', onchange: (e) => { draft.attackType = e.target.value; } },
           el('option', { value: 'physical', selected: draft.attackType !== 'magic' }, 'Physique'),
           el('option', { value: 'magic', selected: draft.attackType === 'magic' }, 'Magique'))) : null,
+      n?.isMain ? mainTalentView(draft, render) : null,
       el('label', { class: 'field', for: 'f-label' }, 'Nom affiché (facultatif)',
         el('input', { type: 'text', id: 'f-label', value: draft.label || '', oninput: (e) => { draft.label = e.target.value; } })),
       el('div', { class: 'form-grid' }, STAT_FIELDS.map(([k, lbl]) => el('label', { for: `f-${k}` }, lbl,
@@ -416,6 +418,33 @@ function openEditor(ti, key) {
   const done = () => { save(); renderTeam(ti); $('#dlg').close(); };
   render();
   $('#dlg').showModal();
+}
+
+// Talents du personnage principal : choisis par le joueur, donc saisis à la main.
+const MAIN_TALENT_STATS = [
+  ['atk', 'Attaque'], ['def', 'Défenses'], ['hp', 'PV'], ['dr', 'Dégâts'], ['air', 'Absorption'],
+  ['finalDmg', 'Dégâts finaux'], ['finalReduction', 'Réduction des dégâts finaux'], ['speed', 'Vitesse'],
+  ['crit', 'Critique'], ['antiCrit', 'Contre'], ['hit', 'Précision'], ['dodge', 'Esquive'], ['block', 'Blocage'],
+  ['sAtk', 'Attaque S'], ['ccRate', 'Taux de contrôle'], ['ccRes', 'Résistance au contrôle'],
+  ['ignoreDef', 'Ignore défense'], ['immuneIgnoreDef', 'Résistance à l\'ignore défense'], ['punch', 'Tour Bonus'], ['aid', 'Aide'],
+];
+
+function mainTalentView(draft, render) {
+  const list = (draft.mainTalents ||= []);
+  return el('fieldset', { class: 'main-talents' },
+    el('legend', {}, 'Talents du personnage principal'),
+    el('p', { class: 'hint' }, 'Bonus permanents sur toute ta formation (alliés) ou malus sur l\'adversaire (ennemis). Ex. : alliés, Attaque, 20.'),
+    ...list.map((t, i) => el('div', { class: 'mt-row' },
+      el('select', { 'aria-label': 'Cible', onchange: (e) => { t.side = e.target.value; } },
+        el('option', { value: 'ally', selected: t.side !== 'enemy' }, 'Alliés'),
+        el('option', { value: 'enemy', selected: t.side === 'enemy' }, 'Ennemis')),
+      el('select', { 'aria-label': 'Stat', onchange: (e) => { t.stat = e.target.value; } },
+        MAIN_TALENT_STATS.map(([k, lbl]) => el('option', { value: k, selected: t.stat === k }, lbl))),
+      el('input', { class: 'num', inputmode: 'decimal', 'aria-label': 'Valeur en %', value: t.value ?? '',
+        oninput: (e) => { t.value = parseNum(e.target.value); } }),
+      el('span', {}, '%'),
+      el('button', { class: 'btn small', type: 'button', title: 'Retirer', onclick: () => { list.splice(i, 1); render(); } }, '×'))),
+    el('button', { class: 'btn small', type: 'button', onclick: () => { list.push({ side: 'ally', stat: 'atk', value: 0 }); render(); } }, '+ Ajouter un talent'));
 }
 
 // ---------- Règles ----------
