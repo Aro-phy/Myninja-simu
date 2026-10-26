@@ -277,6 +277,16 @@ function resolve(sel, caster, units, rng, rules) {
 
 // ---------- Combat ----------
 
+// Stats suivies par le mode inspection (page « Comparatif des bonus »).
+export const INSPECT_STATS = ['hp', 'atk', 'patk', 'matk', 'def', 'pdef', 'mdef', 'dr', 'air', 'finalDmg', 'finalReduction', 'dmgTaken',
+  'speed', 'ccRate', 'ccRes', 'crit', 'antiCrit', 'critDmg', 'block', 'sAtk', 'sBlock', 'sCrit', 'hit', 'dodge', 'punch', 'aid',
+  'ignoreDef', 'immuneIgnoreDef', 'ignoreEnemyAtk', 'weakenAtk', 'weakenDef', 'immuneWeakenDef', 'penBonus', 'penMalus',
+  'pdefShield', 'mdefShield', 'recovery', 'healCut', 'reflectRes', 'sBlockRes', 'dotBonus'];
+
+export function inspect(teamA, teamB, opts = {}) {
+  return simulate(teamA, teamB, { ...opts, inspect: true, log: false });
+}
+
 export function simulate(teamA, teamB, opts = {}) {
   const rules = { ...DEFAULT_RULES, ...(opts.rules || {}) };
   const rng = mulberry32(opts.seed ?? Math.floor(Math.random() * 2 ** 31));
@@ -337,6 +347,15 @@ export function simulate(teamA, teamB, opts = {}) {
   for (const u of units) {
     u.maxHp = (u.stats.hp || 1) * (1 + modSum(u, 'hp') / 100);
     u.hp = u.maxHp;
+  }
+  // Mode « inspection » : bonus de combat de chaque ninja (talents, éveils, natures, équipements fournis),
+  // en tenant compte des bonus alliés et des malus ennemis, sans lancer le combat.
+  if (opts.inspect) {
+    return units.map((u) => ({
+      uid: u.uid, team: u.team, name: u.name, role: u.role,
+      mods: Object.fromEntries(INSPECT_STATS.map((k) => [k, modSum(u, k)])),
+      immune: [...u.immune],
+    }));
   }
 
   // --- états ---

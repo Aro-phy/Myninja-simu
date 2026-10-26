@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Simulateur Myninja</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -158,6 +159,35 @@ dialog::backdrop { background: rgb(10 14 24 / 0.55); }
 .eq-set { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .eq-set details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .eq-set ul { margin: 2px 0 6px; padding-left: 18px; font-size: 13px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
+.tabs button { font: inherit; font-weight: 700; padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--team-a); }
+.page { display: grid; gap: 20px; }
+.page[hidden] { display: none !important; }
+.team-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.team-tools select { max-width: 100%; }
+.np-list { max-height: 240px; }
+.eq-pick.selected { background: var(--team-a-soft); font-weight: 700; }
+.swap { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.swap-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.saved { display: grid; gap: 10px; margin-top: 12px; }
+.saved-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.saved-list li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sv-name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.saved textarea { width: 100%; font-family: var(--font-num); font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+.cmp-out { display: grid; gap: 16px; }
+.tbl-wrap { overflow-x: auto; }
+table.cmp { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+table.cmp caption { text-align: left; font-weight: 700; font-size: 15px; padding: 4px 0 8px; }
+table.cmp th, table.cmp td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+table.cmp th:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+table.cmp thead th { font-size: 12px; vertical-align: bottom; }
+table.cmp td { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+table.cmp td.pos { color: var(--good); }
+table.cmp td.neg { color: var(--hp-low); }
+table.cmp td.zero { color: var(--muted); }
+table.cmp.a caption { color: var(--team-a); }
+table.cmp.b caption { color: var(--team-b); }
 .dlg-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
 .error { color: var(--hp-low); font-size: 14px; font-weight: 700; }
 @media (max-width: 820px) {
@@ -177,12 +207,19 @@ dialog::backdrop { background: rgb(10 14 24 / 0.55); }
     <p class="note" id="demoNote">149 ninjas du jeu. Les stats de la démo sont des valeurs d'exemple : saisis les tiennes.</p>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button type="button" role="tab" id="tab-combat" aria-controls="page-combat">Combat</button>
+    <button type="button" role="tab" id="tab-compare" aria-controls="page-compare">Comparatif des bonus</button>
+    <button type="button" role="tab" id="tab-raw" aria-controls="page-raw">Formations brutes</button>
+  </nav>
+
   <section class="arena" aria-label="Formations">
     <div class="team" data-team="0" id="team0"></div>
     <div class="vs" aria-hidden="true">VS</div>
     <div class="team" data-team="1" id="team1"></div>
   </section>
 
+  <div id="page-combat" class="page">
   <div class="controls">
     <button class="btn primary" id="runOne">Lancer un combat</button>
     <button class="btn" id="runMany">Simuler plusieurs combats</button>
@@ -193,6 +230,53 @@ dialog::backdrop { background: rgb(10 14 24 / 0.55); }
 
   <section class="panel" id="manyPanel" hidden></section>
   <section class="panel" id="result" hidden></section>
+
+  </div>
+
+  <div id="page-compare" class="page" hidden>
+    <section class="panel">
+      <h2>Comparatif des bonus</h2>
+      <p class="note">Choisis une formation pour chaque côté : le tableau montre, ninja par ninja, les bonus de combat reçus (talents, éveils, natures, bonus alliés et malus ennemis). Pour comparer un seul ninja, mets-le seul dans une formation.</p>
+      <div class="controls">
+        <label class="inline" for="cmpA">Nous <select id="cmpA"></select></label>
+        <label class="inline" for="cmpB">Adversaire <select id="cmpB"></select></label>
+        <label class="inline" for="cmpGear"><input type="checkbox" id="cmpGear"> Inclure équipements et accessoires</label>
+        <button class="btn primary" id="runCompare" type="button">Comparer</button>
+      </div>
+      <div id="cmpOut" class="cmp-out"></div>
+    </section>
+  </div>
+
+  <div id="page-raw" class="page" hidden>
+    <section class="panel">
+      <h2>Formations brutes</h2>
+      <p class="note">Les deux formations s'affrontent avec les mêmes stats pour tous les ninjas et sans équipement ni accessoire : seuls les ninjas, leurs talents, éveils et natures font la différence. Tes formations ne sont pas modifiées.</p>
+      <div class="controls">
+        <label class="inline" for="rawA">Formation 1 <select id="rawA"></select></label>
+        <label class="inline" for="rawB">Formation 2 <select id="rawB"></select></label>
+      </div>
+      <details>
+        <summary>Stats communes à tous les ninjas</summary>
+        <div class="form-grid" id="rawStats"></div>
+      </details>
+      <div class="controls">
+        <button class="btn primary" id="rawOne" type="button">Lancer un combat</button>
+        <button class="btn" id="rawMany" type="button">Simuler plusieurs combats</button>
+        <label class="inline" for="rawN">Nombre <input type="number" id="rawN" value="1000" min="10" max="20000" step="10" style="width:90px"></label>
+        <label class="inline" for="rawSeed">Graine <input type="number" id="rawSeed" value="1" style="width:90px"></label>
+        <span class="error" id="rawErr" role="alert"></span>
+      </div>
+    </section>
+    <section class="panel" id="rawManyPanel" hidden></section>
+    <section class="panel" id="rawResult" hidden></section>
+  </div>
+
+  <section class="panel">
+    <details class="rules">
+      <summary>Formations enregistrées</summary>
+      <div id="saved" class="saved"></div>
+    </details>
+  </section>
 
   <section class="panel">
     <details class="rules">

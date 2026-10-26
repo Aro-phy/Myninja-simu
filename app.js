@@ -1,4 +1,4 @@
-import { simulate, simulateMany, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
+import { simulate, simulateMany, inspect, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
 import { NINJAS, SAMPLE_STATS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
@@ -64,6 +64,7 @@ function demoState() {
 }
 
 let state = load() || demoState();
+state.saved ||= [];
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY));
@@ -71,6 +72,7 @@ function load() {
       // Règles par défaut modifiées depuis la sauvegarde : on repart des nouvelles valeurs.
       s.rules = s.rulesVersion === RULES_VERSION ? { ...DEFAULT_RULES, ...s.rules } : { ...DEFAULT_RULES };
       s.rulesVersion = RULES_VERSION;
+      s.saved ||= [];
       return s;
     }
   } catch { /* stockage indisponible */ }
@@ -92,6 +94,7 @@ const el = (tag, attrs = {}, ...kids) => {
   return e;
 };
 const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+const norm = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const short = (n) => (n >= 1e6 ? `${nf.format(n / 1e6)} M` : nf.format(n));
 const parseNum = (s) => {
   const v = parseFloat(String(s).replace(/\s| /g, '').replace(',', '.').replace('%', ''));
@@ -119,8 +122,16 @@ function renderTeam(ti) {
   const root = $(`#team${ti}`);
   root.replaceChildren();
   const nameInput = el('input', { type: 'text', id: `teamName${ti}`, value: t.name, 'aria-label': 'Nom de la formation',
-    oninput: (e) => { t.name = e.target.value; save(); } });
-  root.append(el('div', { class: 'team-head' }, nameInput));
+    oninput: (e) => { t.name = e.target.value; save(); refreshSources(); } });
+  const savedSel = el('select', { id: `load${ti}`, 'aria-label': 'Ouvrir une formation enregistrée',
+    onchange: (e) => { if (e.target.value) { loadSaved(e.target.value, ti); } } },
+  el('option', { value: '' }, state.saved.length ? 'Ouvrir…' : 'Aucune formation enregistrée'),
+  state.saved.map((f) => el('option', { value: f.id }, f.name)));
+  root.append(el('div', { class: 'team-head' }, nameInput),
+    el('div', { class: 'team-tools' },
+      el('button', { type: 'button', class: 'btn small', onclick: () => saveFormation(ti) }, 'Enregistrer la formation'),
+      savedSel,
+      el('span', { class: 'note', id: `saveMsg${ti}`, role: 'status' })));
   const grid = el('div', { class: 'grid133' });
   for (const row of ROWS) {
     const filled = Object.entries(t.slots).filter(([k, m]) => k[0] === row.key && m).length;
@@ -142,6 +153,7 @@ function renderTeam(ti) {
   root.append(grid);
   const errs = validateTeam(toTeam(t)).filter((e) => !e.includes('vide'));
   if (errs.length) root.append(el('div', { class: 'count bad' }, errs.join(' ')));
+  refreshSources();
 }
 
 // ---------- Fiche d'un ninja ----------
@@ -163,7 +175,6 @@ function kitView(n, level) {
 const gearById = Object.fromEntries(GEAR_SETS.map((g) => [g.id, g]));
 const accById = Object.fromEntries(ACCESSORY_SETS.map((a) => [a.id, a]));
 const shortName = (set) => set.name.replace(/^Accessoires /, '');
-const norm = (x) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 function gearView(draft) {
   const eq = draft.equip;
@@ -235,6 +246,125 @@ function gearView(draft) {
   return root;
 }
 
+// Choix du ninja : barre de recherche + liste défilante (même principe que les équipements).
+function ninjaPicker(options, selectedId, onPick) {
+  let query = '';
+  const sorted = [...options].sort((a, b) => a.name.localeCompare(b.name));
+  const list = el('ul', { class: 'eq-list-scroll np-list' });
+  const fill = () => {
+    const items = sorted.filter((o) => !query || norm(o.name).includes(norm(query)))
+      .map((o) => el('li', {}, el('button', { type: 'button', class: `eq-pick${o.id === selectedId ? ' selected' : ''}`,
+        'aria-pressed': o.id === selectedId ? 'true' : 'false', onclick: () => onPick(o.id) }, o.name)));
+    list.replaceChildren(...(items.length ? items : [el('li', { class: 'note' }, 'Aucun ninja ne correspond.')]));
+  };
+  fill();
+  const cur = byId[selectedId];
+  return el('div', { class: 'eq-picker' },
+    el('div', { class: 'eq-picker-head' }, el('strong', {}, cur ? `Ninja : ${cur.name}` : 'Choisir un ninja'),
+      el('span', { class: 'note' }, `${options.length} disponibles`)),
+    el('input', { type: 'search', id: 'np-search', placeholder: 'Rechercher un ninja…', autocomplete: 'off',
+      oninput: (e) => { query = e.target.value; fill(); } }),
+    list);
+}
+
+// Échange d'équipement, d'accessoires ou de stats avec un autre ninja du même groupe
+// (supports entre eux ; attaquants et avant-gardes entre eux), dans l'une ou l'autre formation.
+const roleGroup = (role) => (role === 'supporter' ? 'S' : 'AV');
+function swapView(ti, key, draft) {
+  const me = byId[draft.ninjaId];
+  const targets = [];
+  state.teams.forEach((t, tj) => Object.entries(t.slots).forEach(([k, m]) => {
+    if (!m || !byId[m.ninjaId] || (tj === ti && k === key)) return;
+    if (roleGroup(byId[m.ninjaId].role) !== roleGroup(me.role)) return;
+    targets.push({ tj, k, label: `${t.name} · ${m.label || byId[m.ninjaId].name}` });
+  }));
+  if (!targets.length) return el('div', { class: 'swap' }, el('div', { class: 'col-label' }, 'Échanger'),
+    el('p', { class: 'note' }, me.role === 'supporter' ? 'Aucun autre support dans les formations.' : 'Aucun autre attaquant ou avant-garde dans les formations.'));
+  const sel = el('select', { id: 'swap-target' }, targets.map((x, i) => el('option', { value: i }, x.label)));
+  const doSwap = (what) => {
+    const x = targets[Number(sel.value)];
+    const t = state.teams[ti];
+    t.slots[key] = draft; // la fiche en cours est enregistrée avant l'échange
+    const a = t.slots[key], b = state.teams[x.tj].slots[x.k];
+    for (const m of [a, b]) { if (!m.equip) m.equip = choiceToSlots(m.gear); delete m.gear; }
+    if (what === 'gear') [a.equip.gear, b.equip.gear] = [b.equip.gear, a.equip.gear];
+    if (what === 'acc') [a.equip.acc, b.equip.acc] = [b.equip.acc, a.equip.acc];
+    if (what === 'stats') [a.stats, b.stats] = [b.stats, a.stats];
+    save(); renderTeam(0); renderTeam(1);
+    openEditor(ti, key);
+    const msg = $('#swap-msg'); if (msg) msg.textContent = `Échange effectué avec ${x.label}.`;
+  };
+  return el('div', { class: 'swap' },
+    el('div', { class: 'col-label' }, me.role === 'supporter' ? 'Échanger avec un autre support' : 'Échanger avec un attaquant ou l\'avant-garde'),
+    el('label', { class: 'field', for: 'swap-target' }, 'Ninja', sel),
+    el('div', { class: 'swap-btns' },
+      el('button', { type: 'button', class: 'btn small', onclick: () => doSwap('gear') }, 'Échanger l\'équipement'),
+      el('button', { type: 'button', class: 'btn small', onclick: () => doSwap('acc') }, 'Échanger les accessoires'),
+      el('button', { type: 'button', class: 'btn small', onclick: () => doSwap('stats') }, 'Échanger les stats')),
+    el('p', { class: 'note', id: 'swap-msg', role: 'status' }, 'L\'échange enregistre aussi la fiche en cours.'));
+}
+
+// ---------- Formations enregistrées ----------
+
+const newId = () => `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+function saveFormation(ti) {
+  const t = state.teams[ti];
+  const name = (t.name || '').trim() || `Formation ${state.saved.length + 1}`;
+  const existing = state.saved.find((f) => f.name === name);
+  const entry = { id: existing?.id || newId(), name, slots: structuredClone(t.slots), savedAt: Date.now() };
+  if (existing) Object.assign(existing, entry); else state.saved.push(entry);
+  save(); renderTeam(0); renderTeam(1); renderSaved(); refreshSources();
+  const msg = $(`#saveMsg${ti}`); if (msg) msg.textContent = existing ? `« ${name} » mise à jour.` : `« ${name} » enregistrée.`;
+}
+function loadSaved(id, ti) {
+  const f = state.saved.find((x) => x.id === id);
+  if (!f) return;
+  state.teams[ti] = { name: f.name, slots: structuredClone(f.slots) };
+  save(); renderTeam(ti);
+  const msg = $(`#saveMsg${ti}`); if (msg) msg.textContent = `« ${f.name} » ouverte : modifie-la puis enregistre-la à nouveau.`;
+}
+function renderSaved() {
+  const root = $('#saved');
+  if (!root) return;
+  const rows = state.saved.map((f) => el('li', {},
+    el('span', { class: 'sv-name' }, f.name),
+    el('span', { class: 'note' }, `${Object.values(f.slots).filter(Boolean).length} ninjas`),
+    el('button', { type: 'button', class: 'btn small', onclick: () => loadSaved(f.id, 0) }, 'Ouvrir à gauche'),
+    el('button', { type: 'button', class: 'btn small', onclick: () => loadSaved(f.id, 1) }, 'Ouvrir à droite'),
+    el('button', { type: 'button', class: 'btn small danger', onclick: () => {
+      state.saved = state.saved.filter((x) => x !== f); save(); renderSaved(); renderTeam(0); renderTeam(1); refreshSources();
+    } }, 'Supprimer')));
+  const io = el('textarea', { id: 'io', rows: 3, placeholder: 'Colle ici une sauvegarde pour l\'importer.' });
+  root.replaceChildren(
+    rows.length ? el('ul', { class: 'saved-list' }, rows) : el('p', { class: 'note' }, 'Aucune formation enregistrée. Utilise « Enregistrer la formation » au-dessus d\'une formation.'),
+    el('p', { class: 'note' }, 'Les formations sont gardées dans ce navigateur. Pour les sauvegarder ailleurs ou les passer sur un autre appareil, copie la sauvegarde et colle-la de l\'autre côté.'),
+    io,
+    el('div', { class: 'swap-btns' },
+      el('button', { type: 'button', class: 'btn small', onclick: async () => {
+        const txt = JSON.stringify(state.saved);
+        io.value = txt;
+        try { await navigator.clipboard.writeText(txt); $('#ioMsg').textContent = 'Sauvegarde copiée.'; }
+        catch { io.select(); $('#ioMsg').textContent = 'Sauvegarde affichée : sélectionne-la et copie-la.'; }
+      } }, 'Copier la sauvegarde'),
+      el('button', { type: 'button', class: 'btn small', onclick: () => {
+        try {
+          const list = JSON.parse(io.value);
+          if (!Array.isArray(list)) throw new Error();
+          let n = 0;
+          for (const f of list) {
+            if (!f || !f.slots || !f.name) continue;
+            const ex = state.saved.find((x) => x.name === f.name);
+            const entry = { id: ex?.id || newId(), name: f.name, slots: f.slots, savedAt: f.savedAt || Date.now() };
+            if (ex) Object.assign(ex, entry); else state.saved.push(entry);
+            n++;
+          }
+          save(); renderSaved(); renderTeam(0); renderTeam(1); refreshSources();
+          $('#ioMsg').textContent = `${n} formation(s) importée(s).`;
+        } catch { $('#ioMsg').textContent = 'Sauvegarde illisible : colle le texte complet copié depuis « Copier la sauvegarde ».'; }
+      } }, 'Importer')),
+    el('span', { class: 'note', id: 'ioMsg', role: 'status' }));
+}
+
 function openEditor(ti, key) {
   const t = state.teams[ti];
   const row = ROWS.find((r) => r.key === key[0]);
@@ -250,10 +380,7 @@ function openEditor(ti, key) {
       el('div', { class: 'dlg-head' },
         el('h2', {}, `${t.name} · ${row.label}`),
         el('button', { class: 'btn small', value: 'cancel', type: 'submit' }, 'Fermer')),
-      el('label', { class: 'field', for: 'f-ninja' }, 'Ninja',
-        el('select', { id: 'f-ninja', onchange: (e) => { draft.ninjaId = e.target.value; render(); } },
-          el('option', { value: '' }, '— choisir —'),
-          options.map((o) => el('option', { value: o.id, selected: o.id === draft.ninjaId }, o.name)))),
+      ninjaPicker(options, draft.ninjaId, (id) => { draft.ninjaId = id; render(); }),
       n ? el('div', { class: 'two' },
         n.isMain ? null : el('label', { class: 'field', for: 'f-nature' }, 'Nature de chakra',
           el('select', { id: 'f-nature', onchange: (e) => { draft.nature = e.target.value; } },
@@ -275,10 +402,11 @@ function openEditor(ti, key) {
         el('input', { class: 'num', id: `f-${k}`, inputmode: 'decimal', value: draft.stats[k] ?? '',
           oninput: (e) => { draft.stats[k] = parseNum(e.target.value); } })))),
       gearView(draft),
+      n ? swapView(ti, key, draft) : null,
       el('div', { class: 'dlg-foot' },
         current ? el('button', { class: 'btn danger', type: 'button', onclick: () => { delete t.slots[key]; done(); } }, 'Retirer de la formation') : el('span'),
         el('button', { class: 'btn primary', type: 'button', onclick: () => {
-          if (!draft.ninjaId) { $('#f-ninja').focus(); return; }
+          if (!draft.ninjaId) { $('#np-search').focus(); return; }
           if (byId[draft.ninjaId].isMain && !draft.attackType) draft.attackType = 'physical';
           t.slots[key] = draft; done();
         } }, 'Enregistrer')),
@@ -319,8 +447,11 @@ function runOne() {
   const teams = checkTeams();
   if (!teams) return;
   const seed = Math.round(parseNum($('#seed').value));
+  renderResult($('#result'), teams, seed, 'main');
+}
+
+function renderResult(panel, teams, seed, prefix) {
   const r = simulate(teams[0], teams[1], { seed, rules: state.rules });
-  const panel = $('#result');
   panel.hidden = false;
   const names = [teams[0].name, teams[1].name];
   const verdict = el('div', { class: 'verdict' },
@@ -335,15 +466,15 @@ function runOne() {
         el('span', { class: 'pct' }, u.alive ? `${nf.format(p)} %` : 'K.O.'),
         el('div', { class: 'bar' }, el('i', { style: `width:${p}%;background:${p < 30 ? 'var(--hp-low)' : 'var(--hp)'}` })));
     }));
-  const log = el('div', { class: 'log compact', id: 'logBox' });
+  const log = el('div', { class: 'log compact', id: `logBox-${prefix}` });
   for (const l of r.log) {
     if (l.type === 'round') { log.append(el('div', { class: 'round' }, l.text)); continue; }
     const uid = l.actor || l.attacker || l.target || '';
     const teamCls = uid ? ` t${uid[0]}` : '';
     log.append(el('div', { class: `ln ${l.type}${teamCls}${MINOR.has(l.type) ? ' minor' : ''}` }, l.text));
   }
-  const toggle = el('label', { class: 'inline', for: 'showMinor' },
-    el('input', { type: 'checkbox', id: 'showMinor', onchange: (e) => log.classList.toggle('compact', !e.target.checked) }),
+  const toggle = el('label', { class: 'inline', for: `showMinor-${prefix}` },
+    el('input', { type: 'checkbox', id: `showMinor-${prefix}`, onchange: (e) => log.classList.toggle('compact', !e.target.checked) }),
     'Afficher buffs, debuffs et détails');
   panel.replaceChildren(el('h2', {}, 'Résultat du combat'), verdict,
     el('div', { class: 'final' }, side(0), side(1)),
@@ -355,9 +486,12 @@ function runOne() {
 async function runMany() {
   const teams = checkTeams();
   if (!teams) return;
-  const n = Math.min(20000, Math.max(10, Math.round(parseNum($('#manyN').value))));
-  const seed = Math.round(parseNum($('#seed').value));
-  const btn = $('#runMany');
+  await renderMany($('#manyPanel'), teams, Math.round(parseNum($('#manyN').value)), Math.round(parseNum($('#seed').value)), $('#runMany'));
+}
+
+async function renderMany(panel, teams, nWanted, seed, btn) {
+  const n = Math.min(20000, Math.max(10, nWanted));
+  const label = btn.textContent;
   btn.disabled = true;
   const r = { n, wins: [0, 0], draws: 0, timeouts: 0, rounds: 0 };
   for (let i = 0; i < n; i += 50) {
@@ -368,9 +502,8 @@ async function runMany() {
   }
   r.avgRounds = r.rounds / n;
   btn.disabled = false;
-  btn.textContent = 'Simuler plusieurs combats';
+  btn.textContent = label;
   const pa = (100 * r.wins[0]) / n, pb = (100 * r.wins[1]) / n, pd = (100 * r.draws) / n;
-  const panel = $('#manyPanel');
   panel.hidden = false;
   const seg = (cls, p, txt) => (p > 0 ? el('div', { class: cls, style: `width:${p}%` }, p >= 8 ? txt : '') : null);
   panel.replaceChildren(
@@ -386,8 +519,111 @@ async function runMany() {
   );
 }
 
+// ---------- Sources de formation (actuelles ou enregistrées) ----------
+
+function sourceOptions(defaultValue) {
+  return [
+    el('option', { value: 'cur0', selected: defaultValue === 'cur0' }, `Actuelle à gauche · ${state.teams[0].name}`),
+    el('option', { value: 'cur1', selected: defaultValue === 'cur1' }, `Actuelle à droite · ${state.teams[1].name}`),
+    ...state.saved.map((f) => el('option', { value: `saved:${f.id}`, selected: defaultValue === `saved:${f.id}` }, `Enregistrée · ${f.name}`)),
+  ];
+}
+function getSource(v) {
+  if (v === 'cur0') return state.teams[0];
+  if (v === 'cur1') return state.teams[1];
+  return state.saved.find((f) => `saved:${f.id}` === v) || state.teams[0];
+}
+function refreshSources() {
+  for (const id of ['cmpA', 'cmpB', 'rawA', 'rawB']) {
+    const s = $(`#${id}`); if (!s) continue;
+    const v = s.value; s.replaceChildren(...sourceOptions(v));
+  }
+}
+
+// ---------- Page « Comparatif des bonus » ----------
+
+const CMP_ROWS = [
+  ['hp', 'PV'], ['atk', 'Attaque'], ['patk', 'Attaque physique'], ['matk', 'Attaque stratégique'], ['def', 'Défenses'],
+  ['pdef', 'Défense physique'], ['mdef', 'Défense stratégique'], ['dr', 'Dégâts'], ['air', 'Absorption'],
+  ['finalDmg', 'Dégâts finaux'], ['finalReduction', 'Réduction des dégâts finaux'], ['dmgTaken', 'Dégâts totaux reçus'],
+  ['speed', 'Vitesse'], ['ccRate', 'Taux de contrôle'], ['ccRes', 'Résistance au contrôle (anti-CC)'], ['crit', 'Critique'],
+  ['antiCrit', 'Contre'], ['critDmg', 'Dégâts critiques'], ['block', 'Blocage'], ['sAtk', 'Attaque S'], ['sBlock', 'S.block'],
+  ['sCrit', 'S.crit'], ['hit', 'Précision'], ['dodge', 'Esquive'], ['punch', 'Tour Bonus'], ['aid', 'Aide'],
+  ['ignoreDef', 'Ignore défense'], ['immuneIgnoreDef', 'Résistance à l\'ignore défense'], ['ignoreEnemyAtk', 'Ignore attaque ennemie'],
+  ['weakenAtk', 'Weaken enemy\'s ATK'], ['weakenDef', 'Weaken enemy\'s DEF'], ['immuneWeakenDef', 'Immune Weaken DEF'],
+  ['penBonus', 'Dégâts de pénétration'], ['penMalus', 'Résistance à la pénétration'], ['pdefShield', 'Bouclier physique'],
+  ['mdefShield', 'Bouclier stratégique'], ['recovery', 'Taux de soin reçu'], ['reflectRes', 'Résistance au renvoi'],
+  ['sBlockRes', 'Résistance au s.block'], ['dotBonus', 'Dégâts des DoT'],
+];
+const sign = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + nf.format(Math.abs(v)) + ' %';
+
+function runCompare() {
+  const srcA = getSource($('#cmpA').value), srcB = getSource($('#cmpB').value);
+  const withGear = $('#cmpGear').checked;
+  const strip = (team) => ({ ...team, members: team.members.map((m) => ({ ...m, equipment: withGear ? m.equipment : [] })) });
+  const A = strip(toTeam(srcA)), B = strip(toTeam(srcB));
+  const out = $('#cmpOut');
+  if (!A.members.length || !B.members.length) { out.replaceChildren(el('p', { class: 'error' }, 'Chaque côté doit contenir au moins un ninja.')); return; }
+  const units = inspect(A, B, { rules: { ...state.rules, selfStatsInPanel: false } });
+  const sides = [units.filter((u) => u.team === 0), units.filter((u) => u.team === 1)];
+  const avg = (list, k) => list.reduce((a, u) => a + u.mods[k], 0) / list.length;
+  const rows = CMP_ROWS.filter(([k]) => units.some((u) => Math.abs(u.mods[k]) > 1e-9));
+  const cell = (v) => el('td', { class: v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero' }, v ? sign(v) : '·');
+  const sideTable = (list, title, cls) => el('div', { class: 'tbl-wrap' }, el('table', { class: `cmp ${cls}` },
+    el('caption', {}, title),
+    el('thead', {}, el('tr', {}, el('th', {}, 'Stat'), list.map((u) => el('th', {}, `${u.name}`, el('br'), el('span', { class: 'note' }, ROLE_LABEL[u.role]))), el('th', {}, 'Moyenne'))),
+    el('tbody', {}, rows.map(([k, l]) => el('tr', {}, el('th', {}, l), list.map((u) => cell(u.mods[k])), cell(avg(list, k)))))));
+  const diff = el('div', { class: 'tbl-wrap' }, el('table', { class: 'cmp' },
+    el('caption', {}, 'Comparatif des moyennes par ninja'),
+    el('thead', {}, el('tr', {}, el('th', {}, 'Stat'), el('th', {}, srcA.name), el('th', {}, srcB.name), el('th', {}, 'Écart'))),
+    el('tbody', {}, rows.map(([k, l]) => { const a = avg(sides[0], k), b = avg(sides[1], k);
+      return el('tr', {}, el('th', {}, l), cell(a), cell(b), cell(a - b)); }))));
+  out.replaceChildren(
+    el('p', { class: 'note' }, `Bonus de combat reçus par chaque ninja : talents, éveils, natures de chakra${withGear ? ', équipements et accessoires' : ''}, bonus alliés et malus ennemis compris. Les stats saisies ne sont pas comptées ; les bonus « par tranche de PV perdus » valent 0 en début de combat.`),
+    diff, sideTable(sides[0], srcA.name, 'a'), sideTable(sides[1], srcB.name, 'b'));
+}
+
+// ---------- Page « Formations brutes » ----------
+
+const rawStats = { ...SAMPLE_STATS };
+function rawTeams() {
+  const strip = (src) => {
+    const t = toTeam(src);
+    return { ...t, members: t.members.map((m) => ({ ...m, stats: { ...rawStats }, equipment: [] })) };
+  };
+  const A = strip(getSource($('#rawA').value)), B = strip(getSource($('#rawB').value));
+  const errs = [...validateTeam(A).map((e) => `${A.name} : ${e}`), ...validateTeam(B).map((e) => `${B.name} : ${e}`)];
+  $('#rawErr').textContent = errs.join(' ');
+  return errs.length ? null : [A, B];
+}
+function renderRawForm() {
+  $('#rawStats').replaceChildren(...STAT_FIELDS.map(([k, lbl]) => el('label', { for: `raw-${k}` }, lbl,
+    el('input', { class: 'num', id: `raw-${k}`, inputmode: 'decimal', value: rawStats[k] ?? '',
+      oninput: (e) => { rawStats[k] = parseNum(e.target.value); } }))));
+}
+
+// ---------- Onglets ----------
+
+function showPage(id) {
+  for (const p of ['combat', 'compare', 'raw']) {
+    $(`#page-${p}`).hidden = p !== id;
+    $(`#tab-${p}`).setAttribute('aria-selected', p === id ? 'true' : 'false');
+  }
+  try { localStorage.setItem('myninja-tab', id); } catch { /* ignoré */ }
+}
+
 $('#runOne').addEventListener('click', runOne);
 $('#runMany').addEventListener('click', runMany);
+for (const p of ['combat', 'compare', 'raw']) $(`#tab-${p}`).addEventListener('click', () => showPage(p));
+for (const [id, def] of [['cmpA', 'cur0'], ['cmpB', 'cur1'], ['rawA', 'cur0'], ['rawB', 'cur1']]) $(`#${id}`).replaceChildren(...sourceOptions(def));
+$('#runCompare').addEventListener('click', runCompare);
+$('#rawOne').addEventListener('click', () => { const t = rawTeams(); if (t) renderResult($('#rawResult'), t, Math.round(parseNum($('#rawSeed').value)), 'raw'); });
+$('#rawMany').addEventListener('click', async () => { const t = rawTeams(); if (t) await renderMany($('#rawManyPanel'), t, Math.round(parseNum($('#rawN').value)), Math.round(parseNum($('#rawSeed').value)), $('#rawMany')); });
+renderRawForm();
 renderTeam(0);
 renderTeam(1);
 renderRules();
+renderSaved();
+let startTab = 'combat';
+try { startTab = ['combat', 'compare', 'raw'].includes(location.hash.slice(1)) ? location.hash.slice(1) : localStorage.getItem('myninja-tab') || 'combat'; } catch { /* ignoré */ }
+showPage(['combat', 'compare', 'raw'].includes(startTab) ? startTab : 'combat');
