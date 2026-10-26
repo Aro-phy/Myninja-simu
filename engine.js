@@ -374,7 +374,8 @@ export function simulate(teamA, teamB, opts = {}) {
     if (!tgt.alive) return false;
     const hostile = type !== 'buff';
     const say = (m) => { if (!silent) L('info', m); };
-    if (eff.status && (tgt.immune.has(eff.status) || tgt.effects.some((e) => e.flags?.immuneTo === eff.status))) { say(`${who(tgt)} est immunisé à ${name}.`); return false; }
+    // Immunité à un buff (Super Dodge…) : elle sert à ignorer celui des ennemis, pas à empêcher de le recevoir.
+    if (eff.status && hostile && (tgt.immune.has(eff.status) || tgt.effects.some((e) => e.flags?.immuneTo === eff.status))) { say(`${who(tgt)} est immunisé à ${name}.`); return false; }
     if (hostile && src && src.team !== tgt.team) {
       const dk = dodgeKind(src, tgt);
       if (dk) { say(`${who(tgt)} évite ${name} (${dk}).`); return false; }
@@ -567,7 +568,7 @@ export function simulate(teamA, teamB, opts = {}) {
       for (const t of targets) {
         if (!t || !t.alive) continue;
         if (!owner.alive && !ctx.ownerDead) continue;
-        if (eff.status && t.immune.has(eff.status)) { L('info', `${who(t)} est immunisé à ${STATUSES[eff.status]?.name || eff.status}.`, { target: t.uid }); continue; }
+        if (eff.status && STATUSES[eff.status]?.type !== 'buff' && t.immune.has(eff.status)) { L('info', `${who(t)} est immunisé à ${STATUSES[eff.status]?.name || eff.status}.`, { target: t.uid }); continue; }
         const isCc = eff.status && STATUSES[eff.status]?.type === 'cc';
         let p = eff.chance ?? 100;
         if (isCc && t.team !== owner.team) p += stat(owner, 'ccRate') - stat(t, 'ccRes');
