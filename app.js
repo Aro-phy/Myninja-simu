@@ -4,7 +4,7 @@ import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slo
 import * as D from './describe.js';
 
 const STORE_KEY = 'myninja-sim-v3';
-const RULES_VERSION = 6; // incrémenté quand les règles par défaut changent
+const RULES_VERSION = 7; // incrémenté quand les règles par défaut changent
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 const ROWS = [
   { key: 'V', role: 'vanguard', label: 'Avant-garde', slots: 1 },
@@ -31,8 +31,6 @@ const RULE_FIELDS = [
   ['drCap', 'Plafond du taux de Dégâts (%)', 'number'],
   ['airCap', 'Plafond de l\'Absorption (%)', 'number'],
   ['furyCap', 'Fury maximale', 'number'],
-  ['penFactor', 'Pénétration : % de la valeur de l\'Excel par coup (mesuré en jeu : 30)', 'number'],
-  ['penHits', 'Pénétration : nombre de coups d\'affilée (mesuré en jeu : 4)', 'number'],
   ['maxRounds', 'Limite de rounds (puis victoire aux PV restants)', 'number'],
   ['defenseMode', 'Formule de défense', 'select', [['corrected', 'Corrigée'], ['excel', 'Identique à l\'Excel']]],
   ['applyBaseLine', 'Ajouter la ligne de base du talent (vitesse, Dégâts, Absorption propres) aux stats saisies', 'bool'],
