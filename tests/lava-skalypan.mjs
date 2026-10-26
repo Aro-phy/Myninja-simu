@@ -14,9 +14,9 @@ const fix = (key, st) => ({ ...st, ...(over[key] || {}) });
 export const LAVA = { name: 'Lava X1', members: [
   mk('warrior-sakura', 0, fix('lava-sakura', S(65870148, 45887220, 0, 10612755, 6982662, 14144340, 106, 508.4, 320.7, 323.2, 56.1, 110, 90, 125, 90, 52, 52)),
     eq(['arcane', 'arcane', 'moonlit', 'moonlit', 'arcane', 'arcane'], ['warlord', 'warlord', 'warlord', 'warlord']), { nature: 'water', natureLevel: 2, awakening: 1 }),
-  mk('main', 0, fix('lava-main', S(51927584, 9476371, 0, 10391625, 8321000, 8321000, 50, 319.4, 383.2, 248.5, 168.4, 70.8, 67, 90, 7, 25, 47.5)),
+  mk('main', 0, fix('lava-main', S(51927584, 9476371, 0, 10391625, 9321000, 8321000, 50, 319.4, 383.2, 248.5, 168.4, 70.8, 67, 90, 7, 25, 47.5)),
     eq(['guard', 'guard', 'longen', 'longen', 'senju', 'senju'], ['sakura', 'sakura', 'sakura', 'sakura']), { attackType: 'physical' }),
-  mk('hashirama-madara', 1, fix('lava-hm', S(89458592, 1425275, 0, 8929956, 6691507, 12847793, 104, 384.4, 347.2, 316.5, 104.6, 90, 90, 90, 90, 45, 39.5)),
+  mk('hashirama-madara', 1, fix('lava-hm', S(89458592, 14252756, 0, 8929956, 6691507, 12847793, 104, 384.4, 347.2, 316.5, 104.6, 90, 90, 90, 90, 45, 39.5)),
     eq(g6('vylon'), ['butterfly', 'guard', 'guard', 'moonlit']), { nature: 'water', natureLevel: 2, awakening: 1 }),
   mk('kamado-nezuko', 0, fix('lava-nezuko', S(69045936, 0, 10065135, 7933432, 6251527, 23397840, 104, 319.4, 324.2, 282.2, 105.2, 90, 90, 90, 90, 88, 47.5)),
     eq(g6('infernity'), ['reanimated', 'pain', 'izanami', 'warlord']), { nature: 'water', natureLevel: 2, awakening: 1 }),
