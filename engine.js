@@ -598,9 +598,12 @@ export function simulate(teamA, teamB, opts = {}) {
     else if (eff.penetration) {
       const dk = dodgeKind(owner, t);
       if (dk) { L('miss', `${who(t)} évite la pénétration (${dk}).`); return; }
-      const a = atkParts(owner, eff.attackType || owner.attackType);
+      // Mesuré en jeu : seuls les talents permanents comptent (ni buffs, ni bonus liés aux PV perdus).
+      const key = (eff.attackType || owner.attackType) === 'magic' ? 'matk' : 'patk';
+      const talents = [...(owner.passives.atk || []), ...(owner.passives[key] || [])]
+        .filter((p) => (p.kind || 'talent') === 'talent' && !p.scaleSrc && !p.hpBelow).map((p) => p.value);
       const d = F.penetrationDamage({
-        atkEff: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
+        atkEff: F.effectiveAttack({ atk: owner.stats[key] || 0, talents, icons: 0 }),
         penPct: eff.penetration, penBonus: modSum(owner, 'penBonus'),
         penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
       });
