@@ -7,7 +7,7 @@ const STAT = {
   hp: 'PV', dr: 'Dégâts', air: 'Absorption', finalDmg: 'dégâts finaux', finalReduction: 'réduction des dégâts finaux',
   decreaseReduction: 'baisse de la réduction adverse', dmgTaken: 'dégâts totaux reçus', critDmg: 'dégâts critiques',
   critDmgTaken: 'dégâts critiques reçus', hit: 'précision', dodge: 'esquive', crit: 'critique', antiCrit: 'contre', block: 'blocage',
-  sAtk: 'attaque S', sBlock: 's.block', sCrit: 's.crit', punch: 'punch', aid: 'aide', extraTurn: 'tour bonus', speed: 'vitesse',
+  sAtk: 'attaque S', sBlock: 's.block', sCrit: 's.crit', punch: 'Tour Bonus', aid: 'Aide', extraTurn: 'Tour Bonus', speed: 'vitesse',
   ccRate: 'taux de contrôle', ccRes: 'résistance au contrôle', reflectRes: 'résistance au renvoi', ignoreDef: 'ignore défense',
   immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', recovery: 'taux de soin reçu',
   recoveryCut: 'baisse du taux de soin', healCut: 'réduction de soin', penBonus: 'dégâts de pénétration', penMalus: 'résistance à la pénétration',

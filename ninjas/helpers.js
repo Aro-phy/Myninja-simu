@@ -23,7 +23,7 @@ export const FURY_50 = { self: 50, allies: 30 };
 const STAT_FR = {
   atk: 'attaque', patk: 'attaque physique', matk: 'attaque stratégique', def: 'défenses', hp: 'PV', dr: 'Dégâts', air: 'Absorption',
   finalDmg: 'dégâts finaux', finalReduction: 'réduction dégâts finaux', speed: 'vitesse', hit: 'précision', dodge: 'esquive',
-  crit: 'critique', block: 'blocage', aid: 'aide', punch: 'punch', ccRate: 'taux de contrôle', ccRes: 'résist. contrôle',
+  crit: 'critique', block: 'blocage', aid: 'aide', punch: 'Tour Bonus', ccRate: 'taux de contrôle', ccRes: 'résist. contrôle',
   recoveryCut: 'taux de soin', sAtk: 'attaque S',
 };
 export function describeMods(mods) {

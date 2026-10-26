@@ -4,6 +4,7 @@ import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slo
 import * as D from './describe.js';
 
 const STORE_KEY = 'myninja-sim-v3';
+const RULES_VERSION = 2; // incrémenté quand les règles par défaut changent
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 const ROWS = [
   { key: 'V', role: 'vanguard', label: 'Avant-garde', slots: 1 },
@@ -23,14 +24,13 @@ const RULE_FIELDS = [
   ['specialTeamFury', 'Fury rendue à l\'équipe après une spéciale', 'number'],
   ['blockReduction', 'Réduction des dégâts par blocage (%)', 'number'],
   ['critFirst', 'Critique testé avant le blocage', 'bool'],
-  ['aidDamagePct', 'Dégâts d\'une attaque d\'aide (% du normal)', 'number'],
-  ['aidGivesFury', 'L\'attaque d\'aide donne de la fury', 'bool'],
-  ['aidChains', 'Un ninja aidé peut à son tour donner un punch', 'bool'],
+  ['punchChains', 'Un ninja qui agit grâce au Tour Bonus peut en déclencher un autre', 'bool'],
+  ['aidEnabled', 'Activer l\'Aide (mécanique non confirmée)', 'bool'],
+  ['aidDamagePct', 'Aide : dégâts (% d\'une attaque normale)', 'number'],
   ['maxRounds', 'Limite de rounds (puis victoire aux PV restants)', 'number'],
   ['defenseMode', 'Formule de défense', 'select', [['corrected', 'Corrigée'], ['excel', 'Identique à l\'Excel']]],
   ['applyBaseLine', 'Ajouter la ligne de base du talent (vitesse, Dégâts, Absorption propres) aux stats saisies', 'bool'],
   ['selfStatsInPanel', 'Les bonus fixes « self » sur les stats de l\'écran du ninja sont déjà dans les stats saisies', 'bool'],
-  ['punchIsExtraTurn', '« Punch rate » des descriptions = Tour Bonus (sinon = Aide)', 'bool'],
   ['roleFallback', 'Attaque sur un poste vide : viser la première ligne', 'bool'],
 ];
 
@@ -56,6 +56,7 @@ function demoState() {
       } },
     ],
     rules: { ...DEFAULT_RULES },
+    rulesVersion: RULES_VERSION,
   };
 }
 
@@ -63,7 +64,12 @@ let state = load() || demoState();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (s && s.teams) { s.rules = { ...DEFAULT_RULES, ...s.rules }; return s; }
+    if (s && s.teams) {
+      // Règles par défaut modifiées depuis la sauvegarde : on repart des nouvelles valeurs.
+      s.rules = s.rulesVersion === RULES_VERSION ? { ...DEFAULT_RULES, ...s.rules } : { ...DEFAULT_RULES };
+      s.rulesVersion = RULES_VERSION;
+      return s;
+    }
   } catch { /* stockage indisponible */ }
   return null;
 }
