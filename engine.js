@@ -168,6 +168,8 @@ function modSum(u, stat) {
   return sum;
 }
 const hasFlag = (u, flag) => u.effects.some((e) => e.flags && e.flags[flag]);
+// Buff de la cible pris en compte contre cet attaquant : un attaquant immunisé à ce buff l'ignore.
+const hasFlagVs = (u, flag, att) => u.effects.some((e) => e.flags && e.flags[flag] && !(att && att.immune.has(e.id)));
 const stat = (u, s) => (u.stats[s] || 0) + modSum(u, s);
 
 function atkParts(u, type = u.attackType) {
@@ -508,10 +510,10 @@ export function simulate(teamA, teamB, opts = {}) {
     if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), -modSum(tgt, 'critDmgTaken'));
     if (block) dmg *= 1 - rules.blockReduction / 100;
     if (dmg > 0) dmg = Math.max(0, dmg - shieldAmount(att, tgt));
-    if (label === 'spéciale' && hasFlag(tgt, 'voidSkill')) {
+    if (label === 'spéciale' && hasFlagVs(tgt, 'voidSkill', att)) {
       L('hit', `${who(tgt)} ne subit pas les dégâts de la compétence (Vide).`, { attacker: att.uid });
       dmg = 0;
-    } else if (hasFlag(tgt, 'ignoreDirect')) {
+    } else if (hasFlagVs(tgt, 'ignoreDirect', att)) {
       L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`, { attacker: att.uid });
       dmg = 0;
     } else {
