@@ -10,9 +10,11 @@ export const DEFAULT_RULES = {
   blockReduction: 33,      // % de dégâts retirés par un blocage
   critFirst: true,         // critique testé avant le blocage (les deux ne peuvent pas arriver ensemble)
   punchChains: false,      // un ninja qui vient d'agir grâce au Tour Bonus peut-il à son tour en déclencher un ?
-  aidEnabled: false,       // Aide : mécanique encore inconnue, désactivée (n'a aucun lien avec le Tour Bonus)
-  aidDamagePct: 10,        // si l'Aide est activée : dégâts en % d'une attaque normale (Excel : Aid dmg = DMG/10)
-  aidGivesFury: true,      // si l'Aide est activée : donne-t-elle de la fury ?
+  assist: true,            // Aide (aid rate) : chance que les dégâts reçus soient en partie absorbés (voir strike)
+  assistReduction: 50,     // % des dégâts supprimés par une Aide réussie
+  assistHelperShare: 25,   // % des dégâts reportés sur l'allié qui a le plus de PV (le reste va à la cible)
+  drCap: 800,              // plafond du taux de Dégâts (wiki : environ 800 %)
+  airCap: 700,             // plafond de l'Absorption (wiki : environ 700 %)
   maxRounds: 20,           // limite de rounds ; au-delà : la formation avec le plus de PV restants gagne
   defenseMode: 'corrected',// 'excel' = reproduit le bug de la cellule DEF de l'Excel
   applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
@@ -297,7 +299,6 @@ export function simulate(teamA, teamB, opts = {}) {
   const R = (sel, caster) => resolve(sel, caster, units, rng, rules);
   // Tour Bonus (« punch rate ») : stat de l'écran + bonus/malus de combat (talents alliés, réductions ennemies).
   const punchChance = (u) => stat(u, 'extraTurn') + modSum(u, 'punch');
-  const aidChance = (u) => stat(u, 'aid');
 
   // --- talents, éveils et équipements ---
   function applyEntry(owner, p, source) {
@@ -463,8 +464,8 @@ export function simulate(teamA, teamB, opts = {}) {
     const weaken = Math.max(0, modSum(att, 'weakenDef') - modSum(tgt, 'immuneWeakenDef')) - modSum(tgt, 'weakenAtk');
     const atkEff = F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: a.icons - modSum(tgt, 'ignoreEnemyAtk') - Math.max(0, -weaken) });
     const dEff = defEff(att, tgt, type, rules, -Math.max(0, weaken));
-    const drEff = F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr'), natureDrBonus(att, tgt)]);
-    const airEff = F.effectiveRate(tgt.stats.air || 0, [modSum(tgt, 'air')]);
+    const drEff = Math.min(rules.drCap, F.effectiveRate(att.stats.dr || 0, [modSum(att, 'dr'), natureDrBonus(att, tgt)]));
+    const airEff = Math.min(rules.airCap, F.effectiveRate(tgt.stats.air || 0, [modSum(tgt, 'air')]));
     // (ATK - DEF) et (Dégâts - Absorption) bornés à 0 séparément : deux termes négatifs ne doivent pas donner des dégâts positifs.
     const base = atkEff <= dEff || drEff <= airEff ? 0 : F.hitDamage({
       atkEff,
@@ -478,13 +479,13 @@ export function simulate(teamA, teamB, opts = {}) {
         reduction: modSum(tgt, 'finalReduction'),
         decreaseReduction: modSum(att, 'decreaseReduction') + modSum(tgt, 'decreaseReduction'),
       }),
-    }) * mult * (1 + modSum(tgt, 'dmgTaken') / 100);
+    }) * mult * Math.max(0, 1 + modSum(tgt, 'dmgTaken') / 100);
     const pCrit = F.chance(stat(att, 'crit'), stat(tgt, 'antiCrit'));
     const pBlock = F.chance(stat(tgt, 'block'), stat(att, 'sAtk'));
     let crit = false, block = false;
     if (rules.critFirst) { crit = roll(pCrit); if (!crit) block = roll(pBlock); }
     else { block = roll(pBlock); if (!block) crit = roll(pCrit); }
-    let dmg = base;
+    let dmg = Math.max(0, base); // jamais de dégâts négatifs (malus de dégâts finaux sous −100 %)
     if (crit) dmg *= F.critMultiplier(modSum(att, 'critDmg'), -modSum(tgt, 'critDmgTaken'));
     if (block) dmg *= 1 - rules.blockReduction / 100;
     if (dmg > 0) dmg = Math.max(0, dmg - shieldAmount(att, tgt));
@@ -495,9 +496,24 @@ export function simulate(teamA, teamB, opts = {}) {
       L('hit', `${who(tgt)} ignore les dégâts directs (Shielding).`, { attacker: att.uid });
       dmg = 0;
     } else {
+      // Aide (wiki) : selon l'aid rate de la cible, 50 % des dégâts sont supprimés ; 25 % vont à la cible
+      // et 25 % à l'allié qui a le plus de PV à ce moment (la cible elle-même si c'est elle).
+      let helper = null, helperDmg = 0;
+      if (rules.assist && dmg > 0 && roll(Math.max(0, stat(tgt, 'aid')) / 100)) {
+        helper = units.filter((x) => x.alive && x.team === tgt.team).reduce((a, b) => (b.hp > a.hp ? b : a));
+        const full = dmg;
+        helperDmg = full * rules.assistHelperShare / 100;
+        dmg = full * (100 - rules.assistReduction) / 100 - helperDmg;
+        if (helper === tgt) { dmg += helperDmg; helperDmg = 0; }
+        L('aid', `🤝 Aide : ${who(tgt)} est assisté, ${fmt(full)} dégâts réduits de ${rules.assistReduction} %${helperDmg ? `, ${who(helper)} en prend ${rules.assistHelperShare} %` : ''}.`, { target: tgt.uid });
+      }
       damage(tgt, dmg, att, label, { type: 'hit', extra: { attacker: att.uid, target: tgt.uid, amount: dmg, crit, block },
         text: () => `${who(att)} → ${who(tgt)} : ${fmt(dmg)} dégâts${type !== att.attackType ? (type === 'magic' ? ' stratégiques' : ' physiques') : ''}${crit ? ' (CRITIQUE)' : ''}${block ? ' (BLOQUÉ)' : ''} → ${hpTxt(tgt)}.` });
       ctx.lost.set(tgt, (ctx.lost.get(tgt) || 0) + dmg);
+      if (helperDmg > 0 && helper.alive) {
+        damage(helper, helperDmg, att, 'aide', { type: 'hit', extra: { target: helper.uid, amount: helperDmg },
+          text: () => `${who(helper)} absorbe ${fmt(helperDmg)} dégâts (Aide) → ${hpTxt(helper)}.` });
+      }
     }
     const sCrit = stat(att, 'sCrit') - modSum(tgt, 'sCritRes');
     if (crit && sCrit > 0 && tgt.alive) {
@@ -595,21 +611,21 @@ export function simulate(teamA, teamB, opts = {}) {
     const sealed = u.effects.find((e) => e.flags?.cc === 'seal');
     const canSpecial = u.kit.special && u.fury >= rules.specialCost;
     const noNormal = u.effects.find((e) => e.flags?.cc === 'noNormal');
-    const followUp = mode === 'aid' || mode === 'punch'; // action déclenchée : attaque normale uniquement
+    const followUp = false; // une action déclenchée par le Tour Bonus peut aussi être une spéciale
     if (noNormal && (followUp || !canSpecial || sealed)) {
       L('info', `${who(u)} est sous ${noNormal.name} : attaque normale impossible.`, { actor: u.uid });
       return;
     }
     const useSpecial = !followUp && canSpecial && !sealed;
     const skill = useSpecial ? u.kit.special : u.kit.normal;
-    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'aid' ? 'une attaque d\'aide' : mode === 'punch' ? 'une attaque normale (Tour Bonus)'
+    const name = useSpecial ? `la compétence spéciale « ${skill.name || 'Spéciale'} »` : mode === 'punch' ? 'une attaque normale (Tour Bonus)'
       : skill.name ? `l'attaque normale « ${skill.name} »` : 'une attaque normale';
     L('action', `${who(u)} utilise ${name} (fury ${fmt(u.fury)}).`, { actor: u.uid, special: useSpecial });
     if (sealed && canSpecial && !followUp) L('info', `${who(u)} est sous ${sealed.name} : spéciale impossible.`, { actor: u.uid });
     const ctx = { hit: [], attacker: u, lost: new Map() };
     if (useSpecial) runEffects(u, skill.pre, ctx);
     const struck = new Set();
-    const mult = mode === 'aid' ? rules.aidDamagePct / 100 : 1;
+    const mult = 1;
     for (const h of skillHits(skill, rng)) {
       for (const t of R(h.target || 'front-row', u)) {
         if (!t.alive || !u.alive) continue;
@@ -640,7 +656,7 @@ export function simulate(teamA, teamB, opts = {}) {
         for (const a of units) if (a.alive && a.team === u.team) changeFury(u, a, rules.specialTeamFury);
         L('info', `Fury : ${who(u)} dépense ${rules.specialCost}, toute la formation gagne ${rules.specialTeamFury}.`, { actor: u.uid });
       }
-    } else if (mode !== 'aid' || rules.aidGivesFury) {
+    } else {
       if (f) restore(); else changeFury(u, u, rules.normalFury);
     }
     // déclencheurs « après avoir attaqué » (et « après une compétence spéciale »)
@@ -679,14 +695,6 @@ export function simulate(teamA, teamB, opts = {}) {
     L('extra', `⚡ Tour Bonus (${fmt(chance)} %) : ${who(u)} fait agir ${who(p)}.`, { actor: u.uid });
     act(p, 'punch');
     if (rules.punchChains && !over()) maybePunch(p);
-  }
-
-  function maybeAid(u) {
-    if (!rules.aidEnabled || !u.alive || !roll(aidChance(u) / 100)) return;
-    const p = aidPartner(u);
-    if (!p || p.effects.some((e) => e.flags?.cc === 'hard')) return;
-    L('aid', `👊 Aide ! ${who(u)} déclenche l'action de ${who(p)}.`, { actor: u.uid });
-    act(p, 'aid');
   }
 
   const alive = (t) => units.some((u) => u.team === t && u.alive);
@@ -744,7 +752,6 @@ export function simulate(teamA, teamB, opts = {}) {
       } else {
         act(u, 'main');
         if (!over()) maybePunch(u);
-        if (!over()) maybeAid(u);
       }
     }
     if (u.alive) endOfTurn(u);
