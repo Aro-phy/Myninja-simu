@@ -175,7 +175,7 @@ export const VANGUARDS = [
         st(rand('ally', 2), 'bond', 2),
         st(role('ally', ['assaulter', 'supporter']), 'shielding', 2),
         st(role('ally', ['assaulter', 'supporter']), 'sSuperDodge', 2),
-        st(SELF, 'superDodge', 1),
+        st(SELF, 'sSuperDodge', 1), // le jeu donne du S-Super Dodge (le wiki dit Super Dodge)
       ],
     },
   },

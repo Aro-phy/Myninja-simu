@@ -616,7 +616,9 @@ export function simulate(teamA, teamB, opts = {}) {
     } else if (eff.cleanse) {
       const before = t.effects.length;
       const kinds = eff.cleanse === 'all' ? ['buff', 'debuff', 'dot', 'cc'] : eff.cleanse === 'debuff' ? ['debuff', 'dot', 'cc'] : [eff.cleanse];
-      t.effects = t.effects.filter((e) => !(e.cleansable && Number.isFinite(e.remaining) && kinds.includes(e.type)));
+      // Wiki : un buff non dissipable comme le S-Super Dodge le devient pour un ennemi immunisé à ce buff (ex. Hiruko).
+      const canRemove = (e) => e.cleansable || (owner.team !== t.team && owner.immune.has(e.id));
+      t.effects = t.effects.filter((e) => !(canRemove(e) && Number.isFinite(e.remaining) && kinds.includes(e.type)));
       if (before !== t.effects.length) L('effect', `${who(t)} : ${before - t.effects.length} effet(s) dissipé(s).`, { target: t.uid });
     } else if (eff.hpLossPct) {
       const d = t.hp * eff.hpLossPct / 100;
