@@ -15,6 +15,7 @@ export const DEFAULT_RULES = {
   assistHelperShare: 25,   // % des dégâts reportés sur l'allié qui a le plus de PV (le reste va à la cible)
   drCap: 800,              // plafond du taux de Dégâts (wiki : environ 800 %)
   airCap: 700,             // plafond de l'Absorption (wiki : environ 700 %)
+  penFactor: 30,           // % de la pénétration de l'Excel réellement infligé (mesuré en jeu : 902 323 = 0,300 × Excel)
   maxRounds: 20,           // limite de rounds ; au-delà : la formation avec le plus de PV restants gagne
   defenseMode: 'corrected',// 'excel' = reproduit le bug de la cellule DEF de l'Excel
   applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
@@ -593,7 +594,7 @@ export function simulate(teamA, teamB, opts = {}) {
         atkEff: F.effectiveAttack({ atk: a.atk, talents: a.talents, icons: 0 }),
         penPct: eff.penetration, penBonus: modSum(owner, 'penBonus'),
         penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
-      });
+      }) * rules.penFactor / 100;
       damage(t, d, owner, 'pénétration', { type: 'hit', extra: { attacker: owner.uid, amount: d },
         text: () => `${who(owner)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
     } else if (eff.dot) {
