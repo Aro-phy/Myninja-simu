@@ -15,7 +15,9 @@ export const DEFAULT_RULES = {
   assistHelperShare: 25,   // % des dégâts reportés sur l'allié qui a le plus de PV (le reste va à la cible)
   drCap: 800,              // plafond du taux de Dégâts (wiki : environ 800 %)
   airCap: 700,             // plafond de l'Absorption (wiki : environ 700 %)
-  penFactor: 30,           // % de la pénétration de l'Excel réellement infligé (mesuré en jeu : 902 323 = 0,300 × Excel)
+  furyCap: 122,            // fury maximale gagnée en combat (la fury de départ peut la dépasser)
+  penFactor: 30,           // % de la pénétration de l'Excel infligé par coup (mesuré en jeu : 902 323 = 0,300 × Excel)
+  penHits: 4,              // nombre de coups de pénétration d'affilée (mesuré en jeu : 4)
   maxRounds: 20,           // limite de rounds ; au-delà : la formation avec le plus de PV restants gagne
   defenseMode: 'corrected',// 'excel' = reproduit le bug de la cellule DEF de l'Excel
   applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
@@ -471,7 +473,8 @@ export function simulate(teamA, teamB, opts = {}) {
     if (!t.alive) return;
     if (n > 0 && hasFlag(t, 'noFury')) { L('info', `${who(t)} ne peut pas gagner de fury.`); return; }
     if (n < 0 && src && src.team !== t.team && t.immune.has('furyReduction')) { L('info', `${who(t)} est immunisé à la réduction de fury.`); return; }
-    t.fury = Math.max(0, t.fury + n);
+    // Un gain ne dépasse pas le plafond (une fury de départ plus haute est conservée) ; une perte descend au plus à 0.
+    t.fury = n > 0 ? Math.max(t.fury, Math.min(rules.furyCap, t.fury + n)) : Math.max(0, t.fury + n);
   }
 
   // Un coup direct. Renvoie { hit, dmg }.
@@ -595,8 +598,11 @@ export function simulate(teamA, teamB, opts = {}) {
         penPct: eff.penetration, penBonus: modSum(owner, 'penBonus'),
         penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
       }) * rules.penFactor / 100;
-      damage(t, d, owner, 'pénétration', { type: 'hit', extra: { attacker: owner.uid, amount: d },
-        text: () => `${who(owner)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
+      // Mesuré en jeu : la pénétration tombe en plusieurs coups identiques d'affilée.
+      for (let i = 0; i < rules.penHits && t.alive; i++) {
+        damage(t, d, owner, 'pénétration', { type: 'hit', extra: { attacker: owner.uid, amount: d },
+          text: () => `${who(owner)} → ${who(t)} : ${fmt(d)} dégâts de pénétration → ${hpTxt(t)}.` });
+      }
     } else if (eff.dot) {
       if (eff.dot.name === 'Sticky acid' && t.immune.has('stickyAcid')) { L('info', `${who(t)} est immunisé à Sticky acid.`); return; }
       const a = atkParts(owner);
