@@ -2,6 +2,7 @@ import { simulate, simulateMany, inspect, validateTeam, resolveKit, DEFAULT_RULE
 import { NINJAS, SAMPLE_STATS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
+import { readStatsImage } from './ocr.js';
 
 const STORE_KEY = 'myninja-sim-v3';
 const RULES_VERSION = 7; // incrémenté quand les règles par défaut changent
@@ -387,6 +388,16 @@ function renderSaved() {
     el('span', { class: 'note', id: 'ioMsg', role: 'status' }));
 }
 
+// Image collée (Ctrl+V) pendant que l'éditeur d'un ninja est ouvert → lecture des stats.
+let onPasteImage = null;
+document.addEventListener('paste', (e) => {
+  if (!onPasteImage || !$('#dlg')?.open) return;
+  const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith('image/'));
+  if (!item) return;
+  e.preventDefault();
+  onPasteImage(item.getAsFile());
+});
+
 function openEditor(ti, key) {
   const t = state.teams[ti];
   const row = ROWS.find((r) => r.key === key[0]);
@@ -396,6 +407,39 @@ function openEditor(ti, key) {
   delete draft.gear;
   const form = $('#dlgForm');
   const options = NINJAS.filter((n) => n.role === row.role);
+  // Lecture d'une capture des stats : message d'état et champs non lus (à compléter à la main).
+  let ocr = { busy: false, msg: '', error: false, missing: new Set() };
+  const readImage = async (file) => {
+    if (!file || ocr.busy) return;
+    ocr = { busy: true, msg: 'Lecture de la capture… (la première fois, chargement d\'environ 5 Mo)', error: false, missing: new Set() };
+    render();
+    try {
+      const r = await readStatsImage(file);
+      if (r.found.length) {
+        Object.assign(draft.stats, r.stats);
+        for (const k of r.missing) delete draft.stats[k]; // vidées : à remplir à la main
+      }
+      const label = Object.fromEntries(STAT_FIELDS);
+      ocr = { busy: false, error: !r.found.length, missing: new Set(r.missing),
+        msg: r.found.length
+          ? `${r.found.length} valeurs lues sur ${r.found.length + r.missing.length}. Vérifie-les avant d'enregistrer.${r.missing.length ? ` Non lues (en orange) : ${r.missing.map((k) => label[k].replace(' %', '')).join(', ')}.` : ''}`
+          : 'Aucune stat reconnue : utilise une capture de l\'écran des stats du ninja, nette et non coupée.' };
+    } catch (e) {
+      ocr = { busy: false, error: true, missing: new Set(), msg: `Lecture impossible : ${e.message || e}` };
+    }
+    render();
+  };
+  onPasteImage = readImage;
+  const ocrView = () => {
+    const file = el('input', { type: 'file', accept: 'image/*', id: 'f-ocr', hidden: true,
+      onchange: (e) => { readImage(e.target.files[0]); e.target.value = ''; } });
+    return el('div', { class: 'ocr' },
+      el('div', { class: 'ocr-row' },
+        el('button', { type: 'button', class: 'btn small', disabled: ocr.busy, onclick: () => file.click() },
+          ocr.busy ? 'Lecture…' : 'Lire une capture des stats'),
+        el('span', { class: 'note' }, 'ou colle une capture (Ctrl+V)'), file),
+      ocr.msg ? el('p', { class: `ocr-msg${ocr.error ? ' err' : ''}`, role: 'status' }, ocr.msg) : null);
+  };
   const render = () => {
     const n = byId[draft.ninjaId];
     form.replaceChildren(...[
@@ -421,9 +465,10 @@ function openEditor(ti, key) {
       n?.isMain ? mainTalentView(draft, render) : null,
       el('label', { class: 'field', for: 'f-label' }, 'Nom affiché (facultatif)',
         el('input', { type: 'text', id: 'f-label', value: draft.label || '', oninput: (e) => { draft.label = e.target.value; } })),
+      ocrView(),
       el('div', { class: 'form-grid' }, STAT_FIELDS.map(([k, lbl]) => el('label', { for: `f-${k}` }, lbl,
-        el('input', { class: 'num', id: `f-${k}`, inputmode: 'decimal', value: draft.stats[k] ?? '',
-          oninput: (e) => { draft.stats[k] = parseNum(e.target.value); } })))),
+        el('input', { class: `num${ocr.missing.has(k) ? ' missing' : ''}`, id: `f-${k}`, inputmode: 'decimal', value: draft.stats[k] ?? '',
+          oninput: (e) => { draft.stats[k] = parseNum(e.target.value); ocr.missing.delete(k); e.target.classList.remove('missing'); } })))),
       gearView(draft),
       n ? swapView(ti, key, draft) : null,
       el('div', { class: 'dlg-foot' },

@@ -1,0 +1,95 @@
+// Lecture des stats depuis une capture de l'écran du ninja (OCR tesseract.js, hébergé dans vendor/tesseract).
+
+// Libellés de l'écran du jeu (sans accents, en minuscules, espaces facultatifs) → stat du simulateur.
+// « Atq » est souvent lu « Atg » : les deux sont acceptés.
+// Force, Chakra, Endurance et Agilité sont ignorées.
+const LABELS = [
+  ['hp', 'vie'], ['patk', 'at[qg] ?physique'], ['matk', 'at[qg] ?magique'], ['pdef', 'def ?physique'], ['mdef', 'def ?magique'],
+  ['speed', 'vitesse'], ['fury', 'furie ?initiale'], ['dr', 'degats'], ['air', 'absorption'], ['hit', 'precision'],
+  ['dodge', 'esquive'], ['crit', 'critique'], ['antiCrit', 'contre'], ['sAtk', 'attaque ?s'], ['block', 'blo(?:qu|c)age'],
+  ['extraTurn', 'tour ?bonus'], ['aid', 'aide'],
+];
+export const OCR_STATS = LABELS.map(([k]) => k);
+
+// Texte reconnu → { stats, found, missing }. Une seule attaque est affichée par le jeu : l'autre vaut 0.
+export function parseStats(text) {
+  const t = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const stats = {};
+  for (const [key, label] of LABELS) {
+    // le libellé, quelques caractères parasites (« = », « - », « … »), puis le nombre
+    const re = new RegExp(`(?:^|[^a-z])${label}[^a-z0-9]{0,8}([0-9][0-9]*(?:[.,][0-9]+)?)`);
+    const m = t.match(re);
+    if (m) stats[key] = parseFloat(m[1].replace(',', '.'));
+  }
+  if (stats.patk != null && stats.matk == null) stats.matk = 0;
+  if (stats.matk != null && stats.patk == null) stats.patk = 0;
+  const found = OCR_STATS.filter((k) => stats[k] != null);
+  return { stats, found, missing: OCR_STATS.filter((k) => stats[k] == null) };
+}
+
+let workerPromise = null;
+const base = new URL('./vendor/tesseract/', import.meta.url).href;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error(`Chargement impossible : ${src}`));
+    document.head.append(s);
+  });
+}
+
+async function getWorker() {
+  if (!workerPromise) {
+    workerPromise = (async () => {
+      if (!window.Tesseract) await loadScript(`${base}tesseract.min.js`);
+      return window.Tesseract.createWorker('fra', 1, {
+        workerPath: `${base}worker.min.js`,
+        corePath: `${base}tesseract-core-lstm.wasm.js`,
+        langPath: base.replace(/\/$/, ''),
+        workerBlobURL: false,
+      });
+    })();
+    workerPromise.catch(() => { workerPromise = null; }); // un nouvel essai reste possible
+  }
+  return workerPromise;
+}
+
+// Agrandit l'image, la passe en niveaux de gris, l'inverse si le fond est sombre (texte clair) et étire le contraste.
+async function prepare(file) {
+  const img = await createImageBitmap(file);
+  const scale = Math.max(1, 1300 / img.width);
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+  let sum = 0, lo = 255, hi = 0;
+  const gray = new Uint8ClampedArray(px.length / 4);
+  for (let i = 0; i < gray.length; i++) {
+    const v = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+    gray[i] = v; sum += v;
+  }
+  const invert = sum / gray.length < 128;
+  for (let i = 0; i < gray.length; i++) { const v = invert ? 255 - gray[i] : gray[i]; gray[i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < gray.length; i++) gray[i] = ((gray[i] - lo) * 255) / span;
+  // Léger renforcement de la netteté (images compressées) : pixel + 0,5 × (pixel − moyenne de ses 4 voisins).
+  const W = c.width, H = c.height;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      let v = gray[i];
+      if (x > 0 && y > 0 && x < W - 1 && y < H - 1) v += 0.5 * (4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - W] - gray[i + W]) / 4;
+      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255;
+    }
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
+// Fichier image (ou image collée) → { stats, found, missing, text }.
+export async function readStatsImage(file) {
+  const [worker, canvas] = await Promise.all([getWorker(), prepare(file)]);
+  const { data } = await worker.recognize(canvas);
+  return { ...parseStats(data.text), text: data.text };
+}
