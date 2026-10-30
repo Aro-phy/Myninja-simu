@@ -42,10 +42,13 @@ async function getWorker() {
   if (!workerPromise) {
     workerPromise = (async () => {
       if (!window.Tesseract) await loadScript(`${base}tesseract.min.js`);
-      return window.Tesseract.createWorker('fra', 1, {
+      // Données de langue française (compressées), stockées en base64 dans un .txt pour être servies partout.
+      const resp = await fetch(`${base}fra.traineddata.gz.b64.txt`);
+      if (!resp.ok) throw new Error(`Données de langue introuvables (${resp.status})`);
+      const data = Uint8Array.from(atob((await resp.text()).trim()), (ch) => ch.charCodeAt(0));
+      return window.Tesseract.createWorker([{ code: 'fra', data }], 1, {
         workerPath: `${base}worker.min.js`,
         corePath: `${base}tesseract-core-lstm.wasm.js`,
-        langPath: base.replace(/\/$/, ''),
         workerBlobURL: false,
       });
     })();
