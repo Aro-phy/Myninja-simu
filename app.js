@@ -3,6 +3,7 @@ import { NINJAS, SAMPLE_STATS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
 import { readStatsImage } from './ocr.js';
+import { STAT_FIELDS, formationToFile, parseFormationFile, fileName } from './formation-file.js';
 
 const STORE_KEY = 'myninja-sim-v3';
 const RULES_VERSION = 7; // incrémenté quand les règles par défaut changent
@@ -11,13 +12,6 @@ const ROWS = [
   { key: 'V', role: 'vanguard', label: 'Avant-garde', slots: 1 },
   { key: 'A', role: 'assaulter', label: 'Attaquants', slots: 3 },
   { key: 'S', role: 'supporter', label: 'Supports', slots: 3 },
-];
-const STAT_FIELDS = [
-  ['hp', 'Vie'], ['atk', 'Attaque'], ['pdef', 'Def Physique'], ['mdef', 'Def Magique'],
-  ['speed', 'Vitesse'], ['fury', 'Furie initiale'], ['dr', 'Dégâts %'], ['air', 'Absorption %'],
-  ['hit', 'Précision %'], ['dodge', 'Esquive %'], ['crit', 'Critique %'], ['antiCrit', 'Contre %'],
-  ['sAtk', 'Attaque S %'], ['block', 'Bloquage %'], ['extraTurn', 'Tour Bonus %'], ['aid', 'Aide %'],
-  ['bloodline', 'Bouclier Bloodline %'], ['recovery', 'Taux de soin reçu %'],
 ];
 const RULE_FIELDS = [
   ['normalFury', 'Fury gagnée par attaque normale', 'number'],
@@ -141,6 +135,9 @@ function renderTeam(ti) {
     el('div', { class: 'team-tools' },
       el('button', { type: 'button', class: 'btn small', onclick: () => saveFormation(ti) }, 'Enregistrer la formation'),
       savedSel,
+      el('button', { type: 'button', class: 'btn small', title: 'Télécharger un fichier avec les ninjas, stats et équipements de cette formation',
+        onclick: () => downloadFormation(t.name, t.slots, $(`#saveMsg${ti}`)) }, 'Télécharger'),
+      importButton('Importer un fichier', (list) => importFormations(list, ti, $(`#saveMsg${ti}`)), () => $(`#saveMsg${ti}`)),
       el('span', { class: 'note', id: `saveMsg${ti}`, role: 'status' })));
   const grid = el('div', { class: 'grid133' });
   for (const row of ROWS) {
@@ -337,6 +334,72 @@ function swapView(ti, key, draft) {
 // ---------- Formations enregistrées ----------
 
 const newId = () => `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+// ---------- Fichiers de formation (échange entre joueurs) ----------
+
+// Propose un fichier au joueur : dans l'artifact, via la capacité « downloads » (le navigateur demande
+// confirmation) ; ailleurs (GitHub Pages, fichier local), par un lien de téléchargement classique.
+async function offerFile(filename, text) {
+  const downloads = window.claude?.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (downloads) {
+    try { await downloads.save({ filename, data: text }); return 'saved'; }
+    catch (e) { if (e?.code === 'declined') return 'declined'; if (e?.code === 'rate_limited') return 'busy'; }
+  }
+  if (window.claude?.use) return 'unavailable'; // dans l'artifact, un lien de téléchargement serait bloqué
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = el('a', { href: url, download: filename });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return 'saved';
+}
+
+async function downloadFormation(name, slots, msgEl) {
+  const nm = (name || '').trim() || 'Formation';
+  if (!Object.values(slots || {}).some(Boolean)) { if (msgEl) msgEl.textContent = 'Formation vide : rien à télécharger.'; return; }
+  const text = JSON.stringify(formationToFile(nm, slots), null, 2);
+  const res = await offerFile(fileName(nm), text);
+  if (!msgEl) return;
+  if (res === 'saved') msgEl.textContent = `Fichier « ${fileName(nm)} » téléchargé.`;
+  else if (res === 'declined') msgEl.textContent = 'Téléchargement annulé.';
+  else if (res === 'busy') msgEl.textContent = 'Un téléchargement est déjà en attente : réessaie dans un instant.';
+  else {
+    try { await navigator.clipboard.writeText(text); msgEl.textContent = 'Téléchargement impossible ici : le contenu du fichier a été copié, colle-le dans un fichier .json.'; }
+    catch { msgEl.textContent = 'Téléchargement impossible ici. Utilise « Copier la sauvegarde » dans « Formations enregistrées ».'; }
+  }
+}
+
+// Bouton qui ouvre un ou plusieurs fichiers .json et passe les formations lues à onList.
+function importButton(label, onList, msgEl) {
+  const input = el('input', { type: 'file', accept: '.json,application/json,text/plain', multiple: true, hidden: true,
+    onchange: async (e) => {
+      const files = [...e.target.files]; e.target.value = '';
+      const list = [], errors = [];
+      for (const f of files) {
+        try { list.push(...parseFormationFile(await f.text())); }
+        catch (err) { errors.push(`${f.name} : ${err instanceof SyntaxError ? 'fichier illisible (pas du JSON valide)' : err.message}`); }
+      }
+      if (list.length) onList(list);
+      const m = msgEl();
+      if (errors.length && m) m.textContent = `${m.textContent && list.length ? `${m.textContent} ` : ''}${errors.join(' ')}`;
+    } });
+  return el('span', {}, el('button', { type: 'button', class: 'btn small', onclick: () => input.click() }, label), input);
+}
+
+// Ajoute (ou remplace, à nom égal) les formations importées dans la liste ; ti : côté où ouvrir la première.
+function importFormations(list, ti, msgEl) {
+  for (const f of list) {
+    const ex = state.saved.find((x) => x.name === f.name);
+    const entry = { id: ex?.id || newId(), name: f.name, slots: structuredClone(f.slots), savedAt: Date.now() };
+    if (ex) Object.assign(ex, entry); else state.saved.push(entry);
+  }
+  if (ti != null) state.teams[ti] = { name: list[0].name, slots: structuredClone(list[0].slots) };
+  save(); renderTeam(0); renderTeam(1); renderSaved(); refreshSources();
+  const warnings = list.flatMap((f) => f.warnings || []);
+  const m = ti != null ? $(`#saveMsg${ti}`) : msgEl;
+  if (m) {
+    m.textContent = `${list.length > 1 ? `${list.length} formations importées` : `« ${list[0].name} » importée`}${ti != null ? ' et ouverte' : ''}, et ajoutée aux formations enregistrées.${warnings.length ? ` Attention : ${warnings.join(' ')}` : ''}`;
+  }
+}
+
 function saveFormation(ti) {
   const t = state.teams[ti];
   const name = (t.name || '').trim() || `Formation ${state.saved.length + 1}`;
@@ -361,13 +424,15 @@ function renderSaved() {
     el('span', { class: 'note' }, `${Object.values(f.slots).filter(Boolean).length} ninjas`),
     el('button', { type: 'button', class: 'btn small', onclick: () => loadSaved(f.id, 0) }, 'Ouvrir à gauche'),
     el('button', { type: 'button', class: 'btn small', onclick: () => loadSaved(f.id, 1) }, 'Ouvrir à droite'),
+    el('button', { type: 'button', class: 'btn small', onclick: () => downloadFormation(f.name, f.slots, $('#ioMsg')) }, 'Télécharger'),
     el('button', { type: 'button', class: 'btn small danger', onclick: () => {
       state.saved = state.saved.filter((x) => x !== f); save(); renderSaved(); renderTeam(0); renderTeam(1); refreshSources();
     } }, 'Supprimer')));
-  const io = el('textarea', { id: 'io', rows: 3, placeholder: 'Colle ici une sauvegarde pour l\'importer.' });
+  const io = el('textarea', { id: 'io', rows: 3, placeholder: 'Ou colle ici le contenu d\'un fichier de formation ou d\'une sauvegarde copiée.' });
   root.replaceChildren(
     rows.length ? el('ul', { class: 'saved-list' }, rows) : el('p', { class: 'note' }, 'Aucune formation enregistrée. Utilise « Enregistrer la formation » au-dessus d\'une formation.'),
-    el('p', { class: 'note' }, 'Les formations sont gardées dans ce navigateur. Pour les sauvegarder ailleurs ou les passer sur un autre appareil, copie la sauvegarde et colle-la de l\'autre côté.'),
+    el('p', { class: 'note' }, 'Les formations sont gardées dans ce navigateur. « Télécharger » donne un fichier lisible (ninjas, stats, équipements) à envoyer à un autre joueur, qui l\'ouvre avec « Importer des fichiers ».'),
+    el('div', { class: 'swap-btns' }, importButton('Importer des fichiers', (list) => importFormations(list, null, $('#ioMsg')), () => $('#ioMsg'))),
     io,
     el('div', { class: 'swap-btns' },
       el('button', { type: 'button', class: 'btn small', onclick: async () => {
@@ -377,20 +442,8 @@ function renderSaved() {
         catch { io.select(); $('#ioMsg').textContent = 'Sauvegarde affichée : sélectionne-la et copie-la.'; }
       } }, 'Copier la sauvegarde'),
       el('button', { type: 'button', class: 'btn small', onclick: () => {
-        try {
-          const list = JSON.parse(io.value);
-          if (!Array.isArray(list)) throw new Error();
-          let n = 0;
-          for (const f of list) {
-            if (!f || !f.slots || !f.name) continue;
-            const ex = state.saved.find((x) => x.name === f.name);
-            const entry = { id: ex?.id || newId(), name: f.name, slots: f.slots, savedAt: f.savedAt || Date.now() };
-            if (ex) Object.assign(ex, entry); else state.saved.push(entry);
-            n++;
-          }
-          save(); renderSaved(); renderTeam(0); renderTeam(1); refreshSources();
-          $('#ioMsg').textContent = `${n} formation(s) importée(s).`;
-        } catch { $('#ioMsg').textContent = 'Sauvegarde illisible : colle le texte complet copié depuis « Copier la sauvegarde ».'; }
+        try { importFormations(parseFormationFile(io.value), null, $('#ioMsg')); }
+        catch { $('#ioMsg').textContent = 'Texte illisible : colle le contenu complet d\'un fichier de formation ou d\'une sauvegarde copiée.'; }
       } }, 'Importer')),
     el('span', { class: 'note', id: 'ioMsg', role: 'status' }));
 }

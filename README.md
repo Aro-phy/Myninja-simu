@@ -16,6 +16,7 @@ combat au tour par tour selon la vitesse, journal détaillé et taux de victoire
 | `equipment.js`, `equipment-extra.js` | Sets d'équipement (bonus à 2/4/6 pièces) et d'accessoires (paires + bonus à 8 pièces) |
 | `describe.js` | Retraduit une fiche en français pour vérifier la transcription |
 | `index.html`, `app.js` | Interface web |
+| `formation-file.js` | Fichier d'une formation (JSON lisible : ninjas, stats, équipements), téléchargé et réimporté par la page |
 | `ocr.js`, `vendor/tesseract/` | « Lire une capture des stats » : lecture de l'écran des stats du ninja (tesseract.js, hébergé avec le site) |
 
 ## Lancer en local
@@ -32,6 +33,7 @@ python3 -m http.server 8000
 - `node tests/roster.mjs` : chaque ninja dans des formations aléatoires.
 - `node tests/nature.mjs` : règles de nature de chakra et Chaos.
 - `node tests/void.mjs` : statut Vide (Hyakki Sasori).
+- `node tests/formation-file.mjs` : export puis réimport d'un fichier de formation.
 - `node tests/ocr-parse.mjs` : analyse du texte lu sur une capture des stats.
 - `node tests/weaken.mjs` : « Weaken enemy's DEF » contre « Weaken enemy's ATK ».
 - `node tests/excel-compare.mjs <Damage_formula_En.xlsx> <dossier_temporaire>` : compare `formulas.js` à l'Excel
