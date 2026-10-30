@@ -183,6 +183,7 @@ function gearView(draft) {
   const root = el('div', { class: 'gear' });
   let sel = { kind: 'gear', i: 0 };
   let query = '';
+  const listState = { open: false };
   const bonusList = (entries) => el('ul', {}, entries.map((t) => el('li', {}, D.talent(t))).filter((li) => li.textContent));
 
   const box = (kind, i, label) => {
@@ -217,11 +218,12 @@ function gearView(draft) {
         sel.kind === 'gear' ? '×6' : '×8')));
     const search = el('input', { type: 'search', id: 'eq-search', placeholder: 'Rechercher un set…', value: query, autocomplete: 'off',
       oninput: (e) => { query = e.target.value; const ul = root.querySelector('.eq-list-scroll'); ul.replaceChildren(...picker().querySelector('.eq-list-scroll').children); } });
+    const ul = el('ul', { class: 'eq-list-scroll', id: 'eq-list' }, items.length ? items : [el('li', { class: 'note' }, 'Aucun set ne correspond.')]);
     return el('div', { class: 'eq-picker' },
       el('div', { class: 'eq-picker-head' }, el('strong', {}, slotLabel),
         el('button', { type: 'button', class: 'btn small', onclick: () => equip(null) }, 'Retirer la pièce')),
-      search,
-      el('ul', { class: 'eq-list-scroll' }, items.length ? items : [el('li', { class: 'note' }, 'Aucun set ne correspond.')]));
+      searchBar(search, ul, listState),
+      ul);
   };
 
   const summary = () => {
@@ -249,10 +251,28 @@ function gearView(draft) {
 }
 
 // Choix du ninja : barre de recherche + liste défilante (même principe que les équipements).
+// Barre de recherche + liste repliable : la liste est cachée par défaut, le bouton ⌄ l'affiche,
+// et elle s'ouvre d'elle-même dès qu'on tape un nom. state.open garde l'état entre deux affichages.
+function searchBar(input, list, state) {
+  const btn = el('button', { type: 'button', class: 'search-toggle', 'aria-controls': list.id },
+    el('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
+  const show = (open) => {
+    state.open = open;
+    list.hidden = !open;
+    btn.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', open ? 'Masquer la liste' : 'Afficher la liste');
+  };
+  btn.onclick = () => show(!state.open);
+  input.addEventListener('input', () => { if (input.value.trim()) show(true); });
+  show(!!state.open);
+  return el('div', { class: 'search-row' }, input, btn);
+}
+
 function ninjaPicker(options, selectedId, onPick) {
   let query = '';
   const sorted = [...options].sort((a, b) => a.name.localeCompare(b.name));
-  const list = el('ul', { class: 'eq-list-scroll np-list' });
+  const list = el('ul', { class: 'eq-list-scroll np-list', id: 'np-list' });
   const fill = () => {
     const items = sorted.filter((o) => !query || norm(o.name).includes(norm(query)))
       .map((o) => el('li', {}, el('button', { type: 'button', class: `eq-pick${o.id === selectedId ? ' selected' : ''}`,
@@ -264,8 +284,8 @@ function ninjaPicker(options, selectedId, onPick) {
   return el('div', { class: 'eq-picker' },
     el('div', { class: 'eq-picker-head' }, el('strong', {}, cur ? `Ninja : ${cur.name}` : 'Choisir un ninja'),
       el('span', { class: 'note' }, `${options.length} disponibles`)),
-    el('input', { type: 'search', id: 'np-search', placeholder: 'Rechercher un ninja…', autocomplete: 'off',
-      oninput: (e) => { query = e.target.value; fill(); } }),
+    searchBar(el('input', { type: 'search', id: 'np-search', placeholder: 'Rechercher un ninja…', autocomplete: 'off',
+      oninput: (e) => { query = e.target.value; fill(); } }), list, {}),
     list);
 }
 
