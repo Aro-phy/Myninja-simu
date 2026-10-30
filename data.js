@@ -37,7 +37,7 @@ export const NINJAS = [
 
 // Statistiques d'exemple (reprises de la capture d'écran du jeu).
 export const SAMPLE_STATS = {
-  hp: 65870148, patk: 45887220, matk: 45887220, pdef: 10612755, mdef: 6982662,
+  hp: 65870148, atk: 45887220, pdef: 10612755, mdef: 6982662,
   dr: 508.4, air: 320.7, hit: 323.2, dodge: 56.1, crit: 110, antiCrit: 90,
   sAtk: 125, block: 90, extraTurn: 52, aid: 52, speed: 14144340, fury: 106,
 };

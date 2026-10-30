@@ -40,7 +40,7 @@ python3 -m http.server 8000
 ## Règles connues
 
 - Dégâts = (ATK − DEF) × Skill% × (Dégâts − Absorption)% × multiplicateur de fury × (1 + dégâts finaux%) ; chaque terme négatif donne 0.
-- Supports : attaque magique contre défense magique ; attaquants et avant-garde : physique contre physique ; personnage principal : au choix.
+- Une seule attaque saisie (le jeu l'affiche souvent « Atq Magique » à tort). Supports : elle frappe la défense magique ; attaquants et avant-garde : la défense physique ; personnage principal : au choix. Un coup de type précisé (ex. coup stratégique de Warrior Sakura) frappe la défense de ce type avec la même attaque.
 - Chances opposées : Précision − Esquive, Critique − Contre, Bloquage − Attaque S. Critique et blocage ne se cumulent pas.
 - Attaque normale : toute la première ligne ennemie, +50 fury. Spéciale à 100 fury : −100, +33 à toute la formation.
 - Durées comptées en tours du porteur. Après 20 rounds, la formation avec le plus de PV restants gagne.

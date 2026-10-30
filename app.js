@@ -1,4 +1,4 @@
-import { simulate, simulateMany, inspect, validateTeam, resolveKit, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
+import { simulate, simulateMany, inspect, validateTeam, resolveKit, baseAttack, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
 import { NINJAS, SAMPLE_STATS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
@@ -13,7 +13,7 @@ const ROWS = [
   { key: 'S', role: 'supporter', label: 'Supports', slots: 3 },
 ];
 const STAT_FIELDS = [
-  ['hp', 'Vie'], ['patk', 'Atq Physique'], ['matk', 'Atq Magique'], ['pdef', 'Def Physique'], ['mdef', 'Def Magique'],
+  ['hp', 'Vie'], ['atk', 'Attaque'], ['pdef', 'Def Physique'], ['mdef', 'Def Magique'],
   ['speed', 'Vitesse'], ['fury', 'Furie initiale'], ['dr', 'Dégâts %'], ['air', 'Absorption %'],
   ['hit', 'Précision %'], ['dodge', 'Esquive %'], ['crit', 'Critique %'], ['antiCrit', 'Contre %'],
   ['sAtk', 'Attaque S %'], ['block', 'Bloquage %'], ['extraTurn', 'Tour Bonus %'], ['aid', 'Aide %'],
@@ -103,12 +103,19 @@ const parseNum = (s) => {
   return Number.isFinite(v) ? v : 0;
 };
 
+// Anciennes fiches (attaque physique et magique séparées) → une seule « Attaque ».
+function withAtk(stats = {}) {
+  if (stats.atk != null) return stats;
+  const { patk, matk, ...rest } = stats;
+  return { ...rest, atk: baseAttack(stats) };
+}
+
 function toTeam(t) {
   const members = [];
   for (const [key, m] of Object.entries(t.slots)) {
     if (!m || !byId[m.ninjaId]) continue;
     members.push({
-      ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: m.stats, label: m.label || undefined,
+      ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: withAtk(m.stats), label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
       mainTalents: byId[m.ninjaId].isMain ? m.mainTalents : undefined,
       nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
@@ -405,6 +412,7 @@ function openEditor(ti, key) {
   const draft = current ? structuredClone(current) : { ninjaId: '', stats: { ...SAMPLE_STATS } };
   if (!draft.equip) draft.equip = choiceToSlots(draft.gear);
   delete draft.gear;
+  draft.stats = withAtk(draft.stats);
   const form = $('#dlgForm');
   const options = NINJAS.filter((n) => n.role === row.role);
   // Lecture d'une capture des stats : message d'état et champs non lus (à compléter à la main).

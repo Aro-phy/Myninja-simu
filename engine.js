@@ -120,6 +120,12 @@ function mainTalentEntries(list = []) {
     .map((t) => ({ to: { side: t.side === 'enemy' ? 'enemy' : 'ally', pick: 'all' }, mods: [{ stat: t.stat, value: t.value }] }));
 }
 
+// Attaque unique : le jeu affiche une seule valeur (souvent libellée « Atq Magique » à tort). Elle sert
+// d'attaque physique ou stratégique selon le coup. Anciennes saisies : la plus grande des deux attaques.
+export function baseAttack(stats = {}) {
+  return stats.atk ?? Math.max(stats.patk || 0, stats.matk || 0);
+}
+
 function makeUnit(member, team, index) {
   const n = member.ninja;
   let kit = resolveKit(n, member.awakening);
@@ -139,7 +145,7 @@ function makeUnit(member, team, index) {
     attackType: member.attackType || n.attackType || (n.role === 'supporter' ? 'magic' : 'physical'),
     row: ROWS[n.role],
     pos: member.pos ?? 0,
-    stats: { ...member.stats },
+    stats: { ...member.stats, atk: baseAttack(member.stats) },
     maxHp: member.stats.hp || 1,
     hp: member.stats.hp || 1,
     fury: member.stats.fury ?? 100,
@@ -185,7 +191,7 @@ function atkParts(u, type = u.attackType) {
   const key = type === 'magic' ? 'matk' : 'patk';
   const mods = [...allMods(u, 'atk'), ...allMods(u, key)];
   return {
-    atk: u.stats[key] || 0,
+    atk: u.stats.atk || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
     icons: mods.filter((m) => m.kind !== 'talent').reduce((a, m) => a + m.value, 0),
     negIcons: mods.filter((m) => m.kind !== 'talent' && m.value < 0).reduce((a, m) => a - m.value, 0),
@@ -603,7 +609,7 @@ export function simulate(teamA, teamB, opts = {}) {
       const talents = [...(owner.passives.atk || []), ...(owner.passives[key] || [])]
         .filter((p) => (p.kind || 'talent') === 'talent' && !p.scaleSrc && !p.hpBelow).map((p) => p.value);
       const d = F.penetrationDamage({
-        atkEff: F.effectiveAttack({ atk: owner.stats[key] || 0, talents, icons: 0 }),
+        atkEff: F.effectiveAttack({ atk: owner.stats.atk || 0, talents, icons: 0 }),
         penPct: eff.penetration, penBonus: modSum(owner, 'penBonus'),
         penMalus: modSum(t, 'penMalus'), penMultiplier: modSum(t, 'penMultiplier'),
       });
