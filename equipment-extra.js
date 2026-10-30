@@ -1,6 +1,6 @@
 // Sets lus dans la 2e vidéo des fils Discord « gear-and-accessories ».
 // Mêmes conventions que equipment.js (les stats de l'écran du ninja sont ignorées par le moteur).
-import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, ATTACKER, rand, role, nature, lowestHp, highestHp, m, buff, debuff, st, fixed } from './ninjas/helpers.js';
+import { ALLIES, ALLIES_BUT_SELF, ENEMIES, SELF, TARGET, ATTACKER, rand, role, nature, lowestHp, highestHp, m, buff, debuff, st, fixed } from './ninjas/helpers.js';
 
 const self = (...mods) => ({ to: SELF, mods });
 const attacked = (chance, ...effects) => ({ on: 'attacked', ...(chance < 100 ? { chance } : {}), effects });
@@ -175,6 +175,12 @@ export const GEAR_SETS_2 = [
     2: [self(m('dr', 30))],
     4: [self(m('ccRate', 30)), afterAttack(100, st(rand('enemy', 1), 'painfulWill', 2))],
     6: [self(m('air', 50), m('critDmg', 50)), attacked(50, st(ATTACKER, 'stun', 1))],
+  } },
+  // Noël : « réduit la défense / l'attaque ennemie » = Weaken enemy's DEF / ATK de l'équipement.
+  { id: 'gear-noel', name: 'Noël', tiers: {
+    2: [], // bonus de stats (déjà dans l'écran du ninja)
+    4: [self(m('weakenDef', 30))],
+    6: [self(m('weakenAtk', 40))],
   } },
   { id: 'gear-oblivion', name: 'Oblivion', tiers: {
     2: [self(m('dr', 30))],
@@ -363,6 +369,19 @@ export const ACCESSORY_SETS_2 = [
     p('chakra', self(m('air', 20), m('finalReduction', 20))),
     p('agility', self(m('punch', 20), m('ccRate', 20))),
     p('power', self(m('air', 20), m('hp', 20))),
+  ], full: [] },
+  // Force et Chakra : bonus de stats seulement (déjà dans l'écran du ninja).
+  { id: 'acc-darkmantle', name: 'Accessoires Darkmantle', pairs: [
+    p('force'),
+    p('chakra'),
+    p('agility', afterAttack(100, debuff(TARGET, 1, [m('speed', -20, 'icon')]))), // ennemis touchés : vitesse −20 % pendant 1 tour
+    p('power', afterAttack(20, st(SELF, 'superDodge', 2, C))),
+  ], full: [] },
+  { id: 'acc-corruptor', name: 'Accessoires Corruptor', pairs: [
+    p('force'),
+    p('chakra'),
+    p('agility'),
+    p('power', attacked(40, { to: SELF, cleanse: 'debuff' })),
   ], full: [] },
   // Accessoires Warlord (R1 ou R2). Version saisie : R1.
   { id: 'acc-warlord', name: 'Accessoires Warlord [R1]', pairs: [

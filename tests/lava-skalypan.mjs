@@ -36,7 +36,7 @@ export const SKALYPAN = { name: 'Skalypan', members: [
     eq(g6('pain'), ['pain', 'sunfire', 'moonlit', 'moonlit']), { nature: 'earth', natureLevel: 3, awakening: 3 }),
 ] };
 
-if (process.argv[1].endsWith('lava-skalypan.mjs')) {
+if (process.argv[1]?.endsWith('lava-skalypan.mjs')) {
   console.log(validateTeam(LAVA), validateTeam(SKALYPAN));
   const n = Number(process.env.N || 1000);
   const r1 = simulateMany(LAVA, SKALYPAN, n, { seed: 1 });
