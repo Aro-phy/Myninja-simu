@@ -67,9 +67,12 @@ const setName = (id) => [...GEAR_SETS, ...ACCESSORY_SETS].find((x) => x.id === i
 export const describeEq = (g, id) => {
   const e = g.eq?.[id];
   if (!e) return 'sans équipement';
+  const gearTxt = Array.isArray(e.gear)
+    ? Object.entries(e.gear.reduce((o, x) => ({ ...o, [x]: (o[x] || 0) + 1 }), {})).map(([x, c]) => `${setName(x)} ×${c}`).join(' + ')
+    : `${setName(e.gear)} ×6`;
   const acc = Array.isArray(e.acc) ? e.acc : Array(4).fill(e.acc);
   const same = acc.every((x) => x === acc[0]);
-  return `équipement ${setName(e.gear)} ×6, accessoires ${same ? `${setName(acc[0])} ×8` : `Force ${setName(acc[0])}, Chakra ${setName(acc[1])}, Agilité ${setName(acc[2])}, Puissance ${setName(acc[3])}`}`;
+  return `équipement ${gearTxt}, accessoires ${same ? `${setName(acc[0])} ×8` : `Force ${setName(acc[0])}, Chakra ${setName(acc[1])}, Agilité ${setName(acc[2])}, Puissance ${setName(acc[3])}`}`;
 };
 export const describe = (g) => [g.v ? `${byId[g.v].name} (${g.nat[g.v]})` : null, `Perso principal (${g.mainType === 'magic' ? 'magique' : 'physique'})`,
   ...g.a.map((id) => `${byId[id].name} (${g.nat[id]})`), ...g.s.map((id) => `${byId[id].name} (${g.nat[id]})`)].filter(Boolean).join(' + ');

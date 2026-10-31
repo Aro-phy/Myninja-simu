@@ -24,7 +24,7 @@ const randomEq = () => ({ gear: pick(GEAR_IDS), acc: rnd() < 0.5 ? Array(4).fill
 // formation au hasard : 4 ninjas en plus du personnage principal
 function randomGenome() {
   for (;;) {
-    const hasV = rnd() < 0.75;
+    const hasV = rnd() < 0.6;
     const nA = Math.floor(rnd() * 3); // 0 à 2 attaquants en plus du principal
     const nS = 4 - (hasV ? 1 : 0) - nA;
     if (nS < 0 || nS > 3) continue;
@@ -46,7 +46,8 @@ function mutate(g0) {
     const id = pick(['main', ...ids()]);
     const e = g.eq[id] || (g.eq[id] = randomEq());
     const q = rnd();
-    if (q < 0.4) e.gear = pick(GEAR_IDS);
+    if (q < 0.28) e.gear = pick(GEAR_IDS);
+    else if (q < 0.4) { const a = pick(GEAR_IDS), b = pick(GEAR_IDS); e.gear = [a, a, b, b, a, a]; } // 4 + 2 pièces
     else if (q < 0.8) e.acc[Math.floor(rnd() * 4)] = pick(ACC_IDS);
     else e.acc = Array(4).fill(pick(ACC_IDS));
     return g;
