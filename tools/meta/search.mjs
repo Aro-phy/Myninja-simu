@@ -3,6 +3,7 @@
 import { Worker } from 'node:worker_threads';
 import { writeFileSync } from 'node:fs';
 import { POOL, NATURE_LIST, GEAR_IDS, ACC_IDS, key, describe } from './common.mjs';
+import { REFERENCE } from './reference.mjs';
 
 const GENS = Number(process.env.GENS || 40), POP = Number(process.env.POP || 48), N = Number(process.env.N || 12);
 const OUT = process.env.OUT || 'meta-result.json';
@@ -84,7 +85,7 @@ let pop = Array.from({ length: POP }, randomGenome);
 const hall = [];
 const t0 = Date.now();
 for (let gen = 1; gen <= GENS; gen++) {
-  const opponents = [...hall.slice(-14), ...Array.from({ length: Math.max(4, 18 - hall.length) }, randomGenome)];
+  const opponents = [...REFERENCE, ...hall.slice(-12), ...Array.from({ length: Math.max(3, 15 - hall.length) }, randomGenome)];
   const scores = await Promise.all(pop.map((c, i) => evalCand(c, opponents, N, gen * 100000 + i * 7).then((r) => r.reduce((a, b) => a + b, 0) / r.length)));
   const ranked = pop.map((g, i) => ({ g, s: scores[i] })).sort((a, b) => b.s - a.s);
   if (!hall.length || key(hall[hall.length - 1]) !== key(ranked[0].g)) hall.push(ranked[0].g);

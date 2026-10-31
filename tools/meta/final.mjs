@@ -2,6 +2,7 @@
 import { Worker } from 'node:worker_threads';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { key, core, describe, describeEq, toTeam, byId, RULES } from './common.mjs';
+import { REFERENCE } from './reference.mjs';
 import { simulate, inspect } from '../../engine.js';
 
 const files = process.argv.slice(2);
@@ -26,7 +27,8 @@ const bestByCore = new Map();
 for (const x of cands.map((g, i) => ({ g, s: scores[i] })).sort((a, b) => b.s - a.s)) if (!bestByCore.has(core(x.g))) bestByCore.set(core(x.g), x.g);
 cands = [...bestByCore.values()].slice(0, TOP);
 // 2) tournoi : chacun contre tous les autres finalistes, N combats par duel
-const matrix = await Promise.all(cands.map((c, i) => evalCand(c, cands, N, 99991 + i * 13)));
+// adversaires du tournoi : les finalistes et les formations de référence (rapides, orientées contrôle)
+const matrix = await Promise.all(cands.map((c, i) => evalCand(c, [...cands, ...REFERENCE], N, 99991 + i * 13)));
 const table = cands.map((g, i) => ({ g, s: mean(matrix[i].filter((_, j) => j !== i)), rates: matrix[i] })).sort((a, b) => b.s - a.s);
 // indicateurs : combats finis avant le round 20, taux et résistance de contrôle moyens
 for (const x of table) {
