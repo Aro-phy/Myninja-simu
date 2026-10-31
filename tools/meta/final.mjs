@@ -1,7 +1,7 @@
 // Tournoi final entre les meilleures formations trouvées, puis sensibilité des meilleures à leurs stats.
 import { Worker } from 'node:worker_threads';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { key, core, describe, describeEq, toTeam, byId } from './common.mjs';
+import { key, core, describe, describeEq, toTeam, byId, RULES } from './common.mjs';
 import { simulate, inspect } from '../../engine.js';
 
 const files = process.argv.slice(2);
@@ -31,8 +31,8 @@ const table = cands.map((g, i) => ({ g, s: mean(matrix[i].filter((_, j) => j !==
 // indicateurs : combats finis avant le round 20, taux et résistance de contrôle moyens
 for (const x of table) {
   let ko = 0, n = 0;
-  for (const o of table) if (o !== x) for (let s = 0; s < 6; s++) { const r = simulate(toTeam(x.g, 'A'), toTeam(o.g, 'B'), { seed: s, log: false }); n++; if (!r.timeout) ko++; }
-  const ins = inspect(toTeam(x.g, 'A'), toTeam(table[0] === x ? table[1].g : table[0].g, 'B')).filter((u) => u.team === 0);
+  for (const o of table) if (o !== x) for (let s = 0; s < 6; s++) { const r = simulate(toTeam(x.g, 'A'), toTeam(o.g, 'B'), { seed: s, log: false, rules: RULES }); n++; if (!r.timeout) ko++; }
+  const ins = inspect(toTeam(x.g, 'A'), toTeam(table[0] === x ? table[1].g : table[0].g, 'B'), { rules: RULES }).filter((u) => u.team === 0);
   x.ko = ko / n;
   x.cc = ins.reduce((a, u) => a + u.mods.ccRate, 0) / ins.length;
   x.res = ins.reduce((a, u) => a + u.mods.ccRes, 0) / ins.length;

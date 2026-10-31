@@ -11,26 +11,22 @@ export const POOL = {
 };
 export const NATURE_LIST = ['water', 'fire', 'wind', 'thunder', 'earth'];
 
-// Sets dont un bonus agit en combat (les bonus de stats de l'écran sont déjà dans les stats types).
-const PANEL = new Set(['hp', 'atk', 'patk', 'matk', 'def', 'pdef', 'mdef', 'dr', 'air', 'hit', 'dodge', 'crit', 'antiCrit', 'sAtk', 'block', 'punch', 'extraTurn', 'aid', 'speed']);
-const acts = (entries) => entries.some((x) => (x.talents || []).some((t) => t.on || (t.to && t.to !== 'self') || (t.mods || []).some((m) => !PANEL.has(m.stat))));
-export const GEAR_IDS = GEAR_SETS.filter((g) => acts(equipmentEntries(slotsToChoice({ gear: Array(6).fill(g.id) })))).map((g) => g.id);
-export const ACC_IDS = ACCESSORY_SETS.filter((a) => acts(equipmentEntries(slotsToChoice({ acc: Array(8).fill(a.id) })))).map((a) => a.id);
+// Avec RULES.selfStatsInPanel = false, les bonus de stats des sets comptent aussi : tous les sets sont candidats.
+export const GEAR_IDS = GEAR_SETS.map((g) => g.id);
+export const ACC_IDS = ACCESSORY_SETS.map((a) => a.id);
 
-// Stats types par poste (moyennes arrondies des ninjas relevés dans la vidéo Lava X1 / Skalypan).
-// Les mêmes pour tous : on compare les kits (talents, compétences), pas les comptes.
-export const TEMPLATE = {
-  vanguard: { hp: 70e6, atk: 40e6, pdef: 12e6, mdef: 8e6, speed: 15e6, fury: 100, dr: 450, air: 330, hit: 320, dodge: 60, crit: 90, antiCrit: 90, sAtk: 90, block: 90, extraTurn: 50, aid: 45 },
-  assaulter: { hp: 85e6, atk: 24e6, pdef: 14e6, mdef: 10e6, speed: 16e6, fury: 100, dr: 380, air: 330, hit: 325, dodge: 40, crit: 80, antiCrit: 80, sAtk: 90, block: 70, extraTurn: 40, aid: 42 },
-  supporter: { hp: 95e6, atk: 12e6, pdef: 7.5e6, mdef: 9e6, speed: 21e6, fury: 100, dr: 340, air: 360, hit: 300, dodge: 70, crit: 85, antiCrit: 70, sAtk: 90, block: 75, extraTurn: 80, aid: 52 },
-  main: { hp: 70e6, atk: 10e6, pdef: 20e6, mdef: 22e6, speed: 11e6, fury: 50, dr: 330, air: 330, hit: 270, dodge: 90, crit: 80, antiCrit: 80, sAtk: 90, block: 45, extraTurn: 30, aid: 40 },
-};
+// Stats de base communes à tous les ninjas. Chaque ninja y ajoute ce que son kit lui donne :
+// sa ligne de base de talent (vitesse, Dégâts, Absorption, ex. Warrior Sakura Dégâts +115 %, Absorption +70 %),
+// ses bonus personnels (PV, défenses…) et les bonus de stats de son équipement (règles RULES ci-dessous).
+export const BASE = { hp: 50e6, atk: 25e6, pdef: 8e6, mdef: 8e6, speed: 8e6, fury: 100, dr: 200, air: 200, hit: 300, dodge: 50,
+  crit: 80, antiCrit: 80, sAtk: 90, block: 70, extraTurn: 50, aid: 45 };
+export const RULES = { applyBaseLine: true, selfStatsInPanel: false };
 
 // Génome : { v: id|null, a: [ids] (0 à 2, le personnage principal est toujours là), s: [ids], nat: {id: nature}, mainType, eq?: {id: {gear, acc}} }
 export function toTeam(g, name = 'F', statScale = null) {
   const members = [];
-  const stats = (role, id) => {
-    const base = { ...TEMPLATE[role] };
+  const stats = () => {
+    const base = { ...BASE };
     // facteur (× f) ou décalage ({ add: n })
     if (statScale) for (const [k, f] of Object.entries(statScale)) {
       if (typeof f === 'object') base[k] = (base[k] || 0) + f.add;
@@ -56,8 +52,8 @@ export function toTeam(g, name = 'F', statScale = null) {
 export function winRate(A, B, n, seed) {
   let w = 0;
   for (let i = 0; i < n; i++) {
-    if (i % 2 === 0) { const r = simulate(A, B, { seed: seed + i, log: false }); if (r.winner === 0) w++; else if (r.winner == null) w += 0.5; }
-    else { const r = simulate(B, A, { seed: seed + i, log: false }); if (r.winner === 1) w++; else if (r.winner == null) w += 0.5; }
+    if (i % 2 === 0) { const r = simulate(A, B, { seed: seed + i, log: false, rules: RULES }); if (r.winner === 0) w++; else if (r.winner == null) w += 0.5; }
+    else { const r = simulate(B, A, { seed: seed + i, log: false, rules: RULES }); if (r.winner === 1) w++; else if (r.winner == null) w += 0.5; }
   }
   return w / n;
 }
