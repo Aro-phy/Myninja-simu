@@ -2,14 +2,18 @@
 import { simulate } from '../../engine.js';
 import { NINJAS } from '../../data.js';
 import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, slotsToChoice } from '../../equipment.js';
-import { testStats } from './ninja-stats.mjs';
+import { testStats, RELEASES } from './ninja-stats.mjs';
 
 export const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
-export const POOL = {
-  vanguard: NINJAS.filter((n) => n.role === 'vanguard').map((n) => n.id),
-  assaulter: NINJAS.filter((n) => n.role === 'assaulter' && !n.isMain).map((n) => n.id),
-  supporter: NINJAS.filter((n) => n.role === 'supporter').map((n) => n.id),
-};
+// POOL=recent : seulement les ninjas encore méta (6 dernières avant-gardes, 14 derniers attaquants, 18 derniers supports).
+const recent = (role, k) => RELEASES.filter((id) => byId[id]?.role === role).slice(-k);
+export const POOL = process.env.POOL === 'recent'
+  ? { vanguard: recent('vanguard', 6), assaulter: recent('assaulter', 14), supporter: recent('supporter', 18) }
+  : {
+    vanguard: NINJAS.filter((n) => n.role === 'vanguard').map((n) => n.id),
+    assaulter: NINJAS.filter((n) => n.role === 'assaulter' && !n.isMain).map((n) => n.id),
+    supporter: NINJAS.filter((n) => n.role === 'supporter').map((n) => n.id),
+  };
 export const NATURE_LIST = ['water', 'fire', 'wind', 'thunder', 'earth'];
 
 // Avec RULES.selfStatsInPanel = false, les bonus de stats des sets comptent aussi : tous les sets sont candidats.
