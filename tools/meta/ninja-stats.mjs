@@ -3,7 +3,7 @@
 // Chakra → attaque magique ×2 et défense magique ×1, Agilité → vitesse ×2, Endurance → PV ×5.
 import { NINJAS } from '../../data.js';
 import { resolveKit } from '../../engine.js';
-import { GEAR_PIECE, GEAR_TIER, ACC_PIECE, ACC_PAIR } from './raw-equipment.mjs';
+import { GEAR_PIECE, GEAR_TIER, ACC_PIECE, ACC_PAIR, ACC_FULL } from './raw-equipment.mjs';
 
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 
@@ -103,6 +103,7 @@ function equipRaw(eq) {
     const p = ACC_PIECE[id];
     if (p != null && pair !== 'power') raw[pair] += 2 * (typeof p === 'number' ? p : p[pair]); // 2 pièces par paire
   });
+  if (acc.length === 4 && acc.every((x) => x && x === acc[0])) add(ACC_FULL[acc[0]]);
   return raw;
 }
 

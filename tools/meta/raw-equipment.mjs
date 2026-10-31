@@ -5,7 +5,7 @@
 //   elles diffèrent). Ce sont des stats finales : ajoutées telles quelles.
 // GEAR_TIER  : Force / Chakra / Agilité données par les paliers 2, 4 et 6 pièces.
 // ACC_PIECE  : Force, Chakra et Agilité de chaque accessoire (une paire = 2 pièces) ; la Puissance n'est pas convertie.
-// ACC_PAIR   : Force / Chakra / Agilité données par le bonus d'une paire.
+// ACC_PAIR   : Force / Chakra / Agilité données par le bonus d'une paire ; ACC_FULL : par le bonus des 8 accessoires.
 // Valeurs estimées (lecture incomplète, déduites de la suite décroissante des sets) : marquées « est. ».
 // Sets absents (Noël) : valeurs inconnues, négligées.
 
@@ -115,4 +115,9 @@ export const ACC_PAIR = {
   'acc-otsutsuki': { chakra: { agility: 22000 } },
   'acc-black-feather': { force: { force: 30000 }, chakra: { agility: 30000 }, agility: { chakra: 30000 } },
   'acc-warlord': { force: { force: 40000 }, chakra: { chakra: 40000 }, agility: { agility: 40000 } },
+  'acc-crystalys': { chakra: { agility: 30000 }, agility: { agility: 30000 } },
+};
+// Bonus des 8 accessoires d'un même set.
+export const ACC_FULL = {
+  'acc-crystalys': { agility: 27000 },
 };
