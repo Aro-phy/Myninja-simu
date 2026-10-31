@@ -1,0 +1,147 @@
+{
+ "format": "myninja-formation",
+ "version": 1,
+ "formation": "Lava X1 anti-contrôle (Iron Will)",
+ "ninjas": [
+  {
+   "case": "V0",
+   "ninja": "Warrior Sakura",
+   "id": "warrior-sakura",
+   "nature": "Eau",
+   "niveauNature": 2,
+   "eveil": 1,
+   "stats": {},
+   "equipement": {
+    "Attaque physique": "Arcane",
+    "Défense physique": "Arcane",
+    "Attaque stratégique": "Moonlit",
+    "Défense stratégique": "Moonlit",
+    "Vitesse": "Arcane",
+    "Puissance": "Arcane"
+   },
+   "accessoires": {
+    "Force 1": "Warlord [R1]",
+    "Force 2": "Warlord [R1]",
+    "Chakra 1": "Warlord [R1]",
+    "Chakra 2": "Warlord [R1]",
+    "Agilité 1": "Warlord [R1]",
+    "Agilité 2": "Warlord [R1]",
+    "Puissance 1": "Warlord [R1]",
+    "Puissance 2": "Warlord [R1]"
+   }
+  },
+  {
+   "case": "A0",
+   "ninja": "Personnage principal",
+   "id": "main",
+   "typeAttaque": "physique",
+   "talentsPrincipal": [
+    {
+     "cible": "alliés",
+     "stat": "atk",
+     "valeur": 20
+    }
+   ],
+   "stats": {},
+   "equipement": {
+    "Attaque physique": "Guard",
+    "Défense physique": "Guard",
+    "Attaque stratégique": "Longen",
+    "Défense stratégique": "Longen",
+    "Vitesse": "Senju",
+    "Puissance": "Senju"
+   },
+   "accessoires": {
+    "Force 1": "Sakura",
+    "Force 2": "Sakura",
+    "Chakra 1": "Sakura",
+    "Chakra 2": "Sakura",
+    "Agilité 1": "Sakura",
+    "Agilité 2": "Sakura",
+    "Puissance 1": "Sakura",
+    "Puissance 2": "Sakura"
+   }
+  },
+  {
+   "case": "A1",
+   "ninja": "Hashirama & Madara",
+   "id": "hashirama-madara",
+   "nature": "Eau",
+   "niveauNature": 2,
+   "eveil": 1,
+   "stats": {},
+   "equipement": {
+    "Attaque physique": "Vylon",
+    "Défense physique": "Vylon",
+    "Attaque stratégique": "Vylon",
+    "Défense stratégique": "Vylon",
+    "Vitesse": "Vylon",
+    "Puissance": "Vylon"
+   },
+   "accessoires": {
+    "Force 1": "Iron Will",
+    "Force 2": "Iron Will",
+    "Chakra 1": "Iron Will",
+    "Chakra 2": "Iron Will",
+    "Agilité 1": "Iron Will",
+    "Agilité 2": "Iron Will",
+    "Puissance 1": "Iron Will",
+    "Puissance 2": "Iron Will"
+   }
+  },
+  {
+   "case": "S0",
+   "ninja": "Kamado Nezuko",
+   "id": "kamado-nezuko",
+   "nature": "Eau",
+   "niveauNature": 2,
+   "eveil": 1,
+   "stats": {},
+   "equipement": {
+    "Attaque physique": "Infernity",
+    "Défense physique": "Infernity",
+    "Attaque stratégique": "Infernity",
+    "Défense stratégique": "Infernity",
+    "Vitesse": "Infernity",
+    "Puissance": "Infernity"
+   },
+   "accessoires": {
+    "Force 1": "Reanimated",
+    "Force 2": "Reanimated",
+    "Chakra 1": "Pain",
+    "Chakra 2": "Pain",
+    "Agilité 1": "Izanami",
+    "Agilité 2": "Izanami",
+    "Puissance 1": "Warlord [R1]",
+    "Puissance 2": "Warlord [R1]"
+   }
+  },
+  {
+   "case": "S1",
+   "ninja": "Uchiha Sarada",
+   "id": "uchiha-sarada",
+   "nature": "Eau",
+   "niveauNature": 2,
+   "eveil": 1,
+   "stats": {},
+   "equipement": {
+    "Attaque physique": "Warlord [R4]",
+    "Défense physique": "Warlord [R4]",
+    "Attaque stratégique": "Warlord [R4]",
+    "Défense stratégique": "Warlord [R4]",
+    "Vitesse": "Warlord [R4]",
+    "Puissance": "Warlord [R4]"
+   },
+   "accessoires": {
+    "Force 1": "Arcane",
+    "Force 2": "Arcane",
+    "Chakra 1": "Moonlit",
+    "Chakra 2": "Moonlit",
+    "Agilité 1": "Yaksa",
+    "Agilité 2": "Yaksa",
+    "Puissance 1": "Arcane",
+    "Puissance 2": "Arcane"
+   }
+  }
+ ]
+}
