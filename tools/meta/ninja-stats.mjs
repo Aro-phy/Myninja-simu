@@ -31,7 +31,8 @@ export function ageStep(id) {
   return i >= 0 ? Math.floor(i / 6) : Math.floor((listed.length - 1) / 6) + 1;
 }
 
-// Type d'après les bonus de groupe des talents (alliés ou ennemis, sans les effets déclenchés) :
+// Type d'après les bonus de groupe des talents (alliés ou ennemis, sans les effets déclenchés), plus les bonus de
+// contrôle personnels du ninja (son propre taux ou sa propre résistance au contrôle) :
 // DPS = (taux de contrôle des alliés + ou résistance au contrôle ennemie −) + (attaque ou ignore défense des alliés +)
 //       + (Dégâts ou dégâts finaux des alliés +, ou Absorption ennemie −) ;
 // tank = (taux de contrôle ennemi − ou résistance au contrôle des alliés +) + (défenses des alliés + ou attaque ennemie −)
@@ -42,7 +43,15 @@ export function ninjaType(id) {
   const n = byId[id];
   const f = { cc: false, atk: false, dmg: false, tcc: false, tdef: false, tair: false };
   for (const p of resolveKit(n).talents) {
-    if (p.on || !p.mods || !p.to || p.to === 'self') continue;
+    if (p.on || !p.mods) continue;
+    // bonus de contrôle personnels (taux de contrôle, résistance au contrôle) : comptent aussi pour le critère contrôle
+    if (!p.to || p.to === 'self') {
+      for (const { stat, value } of p.mods) {
+        if (stat === 'ccRate' && value > 0) f.cc = true;
+        if (stat === 'ccRes' && value > 0) f.tcc = true;
+      }
+      continue;
+    }
     const side = typeof p.to === 'object' ? p.to.side : null;
     for (const { stat, value } of p.mods) {
       if (side === 'ally' && value > 0) {
