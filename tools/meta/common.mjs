@@ -39,7 +39,7 @@ export function toTeam(g, name = 'F', statScale = null) {
     const e = g.eq?.[id];
     if (!e) return [];
     const acc = Array.isArray(e.acc) ? e.acc.flatMap((x) => [x, x]) : Array(8).fill(e.acc);
-    return equipmentEntries(slotsToChoice({ gear: Array(6).fill(e.gear), acc }));
+    return equipmentEntries(slotsToChoice({ gear: Array.isArray(e.gear) ? e.gear : Array(6).fill(e.gear), acc }));
   };
   if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats(g.v), nature: g.nat[g.v], natureLevel: 3, equipment: eq(g.v) });
   members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main') });
