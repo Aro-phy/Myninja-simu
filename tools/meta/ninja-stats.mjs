@@ -36,7 +36,8 @@ export function ageStep(id) {
 //       + (Dégâts ou dégâts finaux des alliés +, ou Absorption ennemie −) ;
 // tank = (taux de contrôle ennemi − ou résistance au contrôle des alliés +) + (défenses des alliés + ou attaque ennemie −)
 //       + (Absorption des alliés + ou Dégâts ennemis −).
-// Un ninja qui a les trois groupes de l'un seulement est DPS ou tank ; sinon hybride.
+// Un ninja qui a les trois groupes de l'un seulement est DPS ou tank ; les trois groupes des deux : « DPS et tank »
+// (il reçoit les deux bonus) ; sinon hybride.
 export function ninjaType(id) {
   const n = byId[id];
   const f = { cc: false, atk: false, dmg: false, tcc: false, tdef: false, tair: false };
@@ -62,7 +63,7 @@ export function ninjaType(id) {
     }
   }
   const dps = f.cc && f.atk && f.dmg, tank = f.tcc && f.tdef && f.tair;
-  return dps && !tank ? 'DPS' : tank && !dps ? 'tank' : 'hybride';
+  return dps && tank ? 'DPS et tank' : dps ? 'DPS' : tank ? 'tank' : 'hybride';
 }
 
 // Stats de l'équipement : brutes (Force, Chakra, Agilité) des paliers, paires et accessoires,
@@ -99,8 +100,8 @@ export function testStats(id, eq, mainType = 'physical', common = {}) {
     for (const k of ['force', 'chakra', 'agility']) r[k] -= 500 * step;
     r.hp -= 5000 * step;
     const type = ninjaType(id);
-    if (type === 'DPS') r.agility += 1000;
-    if (type === 'tank') r.hp += 10000;
+    if (type.includes('DPS')) r.agility += 1000;
+    if (type.includes('tank')) r.hp += 10000;
   }
   const e = equipRaw(eq);
   const force = r.force + e.force, chakra = r.chakra + e.chakra, agility = r.agility + e.agility;
