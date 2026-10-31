@@ -3,7 +3,7 @@
 // Chakra → attaque magique ×2 et défense magique ×1, Agilité → vitesse ×2, Endurance → PV ×5.
 import { NINJAS } from '../../data.js';
 import { resolveKit } from '../../engine.js';
-import { RAW_GEAR, RAW_ACC } from './raw-equipment.mjs';
+import { GEAR_PIECE, GEAR_TIER, ACC_PIECE, ACC_PAIR } from './raw-equipment.mjs';
 
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 
@@ -65,13 +65,28 @@ export function ninjaType(id) {
   return dps && !tank ? 'DPS' : tank && !dps ? 'tank' : 'hybride';
 }
 
-// Stats brutes de l'équipement : set de 6 pièces (paliers 2, 4 et 6) et 4 paires d'accessoires.
+// Stats de l'équipement : brutes (Force, Chakra, Agilité) des paliers, paires et accessoires,
+// et finales (attaque, défenses, vitesse) des 6 pièces d'équipement.
 function equipRaw(eq) {
-  const raw = { force: 0, chakra: 0, agility: 0, endurance: 0 };
+  const raw = { force: 0, chakra: 0, agility: 0, endurance: 0, atk: 0, pdef: 0, mdef: 0, speed: 0 };
   const add = (o) => { for (const [k, v] of Object.entries(o || {})) raw[k] += v; };
-  if (eq?.gear && RAW_GEAR[eq.gear]) for (const t of [2, 4, 6]) add(RAW_GEAR[eq.gear][t]);
+  if (eq?.gear) {
+    for (const t of [2, 4, 6]) add(GEAR_TIER[eq.gear]?.[t]);
+    const p = GEAR_PIECE[eq.gear];
+    if (p != null) {
+      const v = typeof p === 'number' ? { atk: p, pdef: p, mdef: p } : { atk: p.atk, pdef: p.pdef ?? p.def ?? p.atk, mdef: p.mdef ?? p.def ?? p.atk };
+      // une pièce d'attaque du type du ninja, les deux pièces de défense, la pièce de vitesse
+      add({ atk: v.atk, pdef: v.pdef, mdef: v.mdef, speed: v.atk });
+    }
+  }
   const acc = Array.isArray(eq?.acc) ? eq.acc : eq?.acc ? Array(4).fill(eq.acc) : [];
-  ['force', 'chakra', 'agility', 'power'].forEach((pair, i) => { if (acc[i] && RAW_ACC[acc[i]]) add(RAW_ACC[acc[i]][pair]); });
+  ['force', 'chakra', 'agility', 'power'].forEach((pair, i) => {
+    const id = acc[i];
+    if (!id) return;
+    add(ACC_PAIR[id]?.[pair]);
+    const p = ACC_PIECE[id];
+    if (p != null && pair !== 'power') raw[pair] += 2 * (typeof p === 'number' ? p : p[pair]); // 2 pièces par paire
+  });
   return raw;
 }
 
@@ -93,8 +108,8 @@ export function testStats(id, eq, mainType = 'physical', common = {}) {
   return {
     ...common,
     hp: r.hp + 5 * e.endurance,
-    atk: magic ? 2 * chakra : 2 * force,
-    pdef: force, mdef: chakra,
-    speed: 2 * agility,
+    atk: (magic ? 2 * chakra : 2 * force) + e.atk,
+    pdef: force + e.pdef, mdef: chakra + e.mdef,
+    speed: 2 * agility + e.speed,
   };
 }
