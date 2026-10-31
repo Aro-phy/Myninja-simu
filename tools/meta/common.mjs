@@ -2,6 +2,7 @@
 import { simulate } from '../../engine.js';
 import { NINJAS } from '../../data.js';
 import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, slotsToChoice } from '../../equipment.js';
+import { testStats } from './ninja-stats.mjs';
 
 export const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 export const POOL = {
@@ -15,20 +16,17 @@ export const NATURE_LIST = ['water', 'fire', 'wind', 'thunder', 'earth'];
 export const GEAR_IDS = GEAR_SETS.map((g) => g.id);
 export const ACC_IDS = ACCESSORY_SETS.map((a) => a.id);
 
-// Stats de base communes à tous les ninjas. Chaque ninja y ajoute ce que son kit lui donne :
-// sa ligne de base de talent (vitesse, Dégâts, Absorption, ex. Warrior Sakura Dégâts +115 %, Absorption +70 %),
-// ses bonus personnels (PV, défenses…) et les bonus de stats de son équipement (règles RULES ci-dessous).
-export const BASE = { hp: 50e6, pdef: 8e6, mdef: 8e6, speed: 8e6, fury: 100, dr: 200, air: 200, hit: 300, dodge: 50,
-  crit: 80, antiCrit: 80, sAtk: 90, block: 70, extraTurn: 50, aid: 45 };
-// Attaque = rapport × défenses : 2 pour les supports, 3 pour les attaquants, l'avant-garde et le personnage principal.
-export const ATK_RATIO = { vanguard: 3, assaulter: 3, main: 3, supporter: 2 };
+// Stats de test : PV, attaque, défenses et vitesse viennent de ninja-stats.mjs (stats brutes selon le poste, l'ancienneté,
+// le type DPS/tank et les stats brutes connues de l'équipement). Le reste est commun à tous ; chaque ninja y ajoute
+// sa ligne de base de talent (vitesse, Dégâts, Absorption), ses bonus personnels et les bonus en % de son équipement.
+export const BASE = { fury: 100, dr: 200, air: 200, hit: 300, dodge: 50, crit: 80, antiCrit: 80, sAtk: 90, block: 70, extraTurn: 50, aid: 45 };
 export const RULES = { applyBaseLine: true, selfStatsInPanel: false };
 
 // Génome : { v: id|null, a: [ids] (0 à 2, le personnage principal est toujours là), s: [ids], nat: {id: nature}, mainType, eq?: {id: {gear, acc}} }
 export function toTeam(g, name = 'F', statScale = null) {
   const members = [];
-  const stats = (role) => {
-    const base = { ...BASE, atk: BASE.pdef * ATK_RATIO[role] };
+  const stats = (id) => {
+    const base = testStats(id, g.eq?.[id], g.mainType, BASE);
     // facteur (× f) ou décalage ({ add: n })
     if (statScale) for (const [k, f] of Object.entries(statScale)) {
       if (typeof f === 'object') base[k] = (base[k] || 0) + f.add;
@@ -43,10 +41,10 @@ export function toTeam(g, name = 'F', statScale = null) {
     const acc = Array.isArray(e.acc) ? e.acc.flatMap((x) => [x, x]) : Array(8).fill(e.acc);
     return equipmentEntries(slotsToChoice({ gear: Array(6).fill(e.gear), acc }));
   };
-  if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats('vanguard'), nature: g.nat[g.v], natureLevel: 3, equipment: eq(g.v) });
+  if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats(g.v), nature: g.nat[g.v], natureLevel: 3, equipment: eq(g.v) });
   members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main') });
-  g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats('assaulter'), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
-  g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats('supporter'), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
+  g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
+  g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
   return { name, members };
 }
 
