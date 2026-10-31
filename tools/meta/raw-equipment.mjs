@@ -6,7 +6,7 @@
 // GEAR_TIER  : Force / Chakra / Agilité données par les paliers 2, 4 et 6 pièces.
 // ACC_PIECE  : Force, Chakra et Agilité de chaque accessoire (une paire = 2 pièces) ; la Puissance n'est pas convertie.
 // ACC_PAIR   : Force / Chakra / Agilité données par le bonus d'une paire ; ACC_FULL : par le bonus des 8 accessoires.
-// Valeurs estimées (lecture incomplète, déduites de la suite décroissante des sets) : marquées « est. ».
+// Valeurs des accessoires vérifiées sur une 3e vidéo (Susano 67 500, Iron Will 66 500, Summoning 64 000, Mekansm 61 500, Vylon 59 500).
 // Sets absents (Noël) : valeurs inconnues, négligées.
 
 export const GEAR_PIECE = {
@@ -93,10 +93,10 @@ export const GEAR_TIER = {
 
 // Accessoires : valeur par pièce, identique pour Force, Chakra et Agilité, ou { force, chakra, agility }.
 export const ACC_PIECE = {
-  'acc-yin-yang': 68000, 'acc-akatsuki': 68000, 'acc-izanami': 68000, 'acc-gold': 67500 /* est. */, 'acc-crystalys': 67000,
-  'acc-iron-will': 66500 /* est. */, 'acc-green': 66000, 'acc-sand-burial': 65500, 'acc-baryon': 65000, 'acc-tarrasque': 64500,
-  'acc-red': 64000 /* est. */, 'acc-radiance': 62500, 'acc-flamvell': 62000, 'acc-mekansm': 61500 /* est. */, 'acc-arcane': 61000,
-  'acc-butterfly': 60500, 'acc-infernity': 60000, 'acc-vylon': 59500 /* est. */, 'acc-moonlit': 59000, 'acc-yaksa': 58500,
+  'acc-yin-yang': 68000, 'acc-akatsuki': 68000, 'acc-izanami': 68000, 'acc-gold': 67500, 'acc-crystalys': 67000,
+  'acc-iron-will': 66500, 'acc-green': 66000, 'acc-sand-burial': 65500, 'acc-baryon': 65000, 'acc-tarrasque': 64500,
+  'acc-red': 64000, 'acc-radiance': 62500, 'acc-flamvell': 62000, 'acc-mekansm': 61500, 'acc-arcane': 61000,
+  'acc-butterfly': 60500, 'acc-infernity': 60000, 'acc-vylon': 59500, 'acc-moonlit': 59000, 'acc-yaksa': 58500,
   'acc-sunfire': 58000, 'acc-guren': 57500, 'acc-guard': 57000, 'acc-pain': 56500, 'acc-amenohoko': 56000, 'acc-reanimated': 55500,
   'acc-sunagakure': 55000, 'acc-sakura': { force: 53500, chakra: 53500, agility: 55000 }, 'acc-amegakure': 54000,
   'acc-longen': { force: 53000, chakra: 53000, agility: 54500 }, 'acc-kumogakure': { force: 52500, chakra: 52500, agility: 54000 },
