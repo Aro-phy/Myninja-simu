@@ -7,6 +7,7 @@ import { REFERENCE } from './reference.mjs';
 
 const GENS = Number(process.env.GENS || 40), POP = Number(process.env.POP || 48), N = Number(process.env.N || 12);
 const OUT = process.env.OUT || 'meta-result.json';
+if (process.env.MODE === 'meta' && !REFERENCE.length) throw new Error('MODE=meta : aucune formation dans tools/meta/references/');
 let seed = Number(process.env.SEED || 12345);
 const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
 const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -86,7 +87,9 @@ let pop = Array.from({ length: POP }, randomGenome);
 const hall = [];
 const t0 = Date.now();
 for (let gen = 1; gen <= GENS; gen++) {
-  const opponents = [...REFERENCE, ...hall.slice(-12), ...Array.from({ length: Math.max(3, 15 - hall.length) }, randomGenome)];
+  // MODE=meta : les formations sont jugées uniquement contre les formations de référence (le méta actuel du jeu)
+  const opponents = process.env.MODE === 'meta' ? REFERENCE
+    : [...REFERENCE, ...hall.slice(-12), ...Array.from({ length: Math.max(3, 15 - hall.length) }, randomGenome)];
   const scores = await Promise.all(pop.map((c, i) => evalCand(c, opponents, N, gen * 100000 + i * 7).then((r) => r.reduce((a, b) => a + b, 0) / r.length)));
   const ranked = pop.map((g, i) => ({ g, s: scores[i] })).sort((a, b) => b.s - a.s);
   if (!hall.length || key(hall[hall.length - 1]) !== key(ranked[0].g)) hall.push(ranked[0].g);
