@@ -7,7 +7,7 @@
 // ACC_PIECE  : Force, Chakra et Agilité de chaque accessoire (une paire = 2 pièces) ; la Puissance n'est pas convertie.
 // ACC_PAIR   : Force / Chakra / Agilité données par le bonus d'une paire.
 // Valeurs estimées (lecture incomplète, déduites de la suite décroissante des sets) : marquées « est. ».
-// Sets absents : valeurs inconnues, négligées.
+// Sets absents (Noël) : valeurs inconnues, négligées.
 
 export const GEAR_PIECE = {
   'gear-yin-yang': 78500, 'gear-akatsuki': 77500, 'gear-izanami': 77000, 'gear-susano': 76500, 'gear-crystalys': 76000,
@@ -27,6 +27,7 @@ export const GEAR_PIECE = {
   'gear-deatbone': { atk: 28000, pdef: 26000, mdef: 30000 }, 'gear-corruptor': { atk: 26000, pdef: 24000, mdef: 28000 },
   'gear-oblivion': { atk: 24000, pdef: 22000, mdef: 26000 }, 'gear-stormrage': { atk: 22000, pdef: 20000, mdef: 24000 },
   'gear-frost-fire': { atk: 20000, pdef: 18000, mdef: 22000 },
+  'gear-defiance': 73000, 'gear-black-feather': 72000, 'gear-warlord': 66000,
 };
 
 const a = (agility) => ({ agility });
@@ -87,6 +88,7 @@ export const GEAR_TIER = {
   'gear-stormrage': { 2: a(6000), 4: a(10000), 6: a(15000) },
   'gear-frost-fire': { 2: a(8000), 4: a(10000), 6: a(15000) },
   'gear-warlord': { 2: { force: 15000, agility: 15000, chakra: 15000 }, 4: a(20000), 6: a(20000) },
+  'gear-defiance': { 2: { chakra: 25000, agility: 25000 }, 4: { chakra: 35000, agility: 35000 } },
 };
 
 // Accessoires : valeur par pièce, identique pour Force, Chakra et Agilité, ou { force, chakra, agility }.
