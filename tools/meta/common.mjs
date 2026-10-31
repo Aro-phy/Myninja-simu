@@ -18,15 +18,17 @@ export const ACC_IDS = ACCESSORY_SETS.map((a) => a.id);
 // Stats de base communes à tous les ninjas. Chaque ninja y ajoute ce que son kit lui donne :
 // sa ligne de base de talent (vitesse, Dégâts, Absorption, ex. Warrior Sakura Dégâts +115 %, Absorption +70 %),
 // ses bonus personnels (PV, défenses…) et les bonus de stats de son équipement (règles RULES ci-dessous).
-export const BASE = { hp: 50e6, atk: 25e6, pdef: 8e6, mdef: 8e6, speed: 8e6, fury: 100, dr: 200, air: 200, hit: 300, dodge: 50,
+export const BASE = { hp: 50e6, pdef: 8e6, mdef: 8e6, speed: 8e6, fury: 100, dr: 200, air: 200, hit: 300, dodge: 50,
   crit: 80, antiCrit: 80, sAtk: 90, block: 70, extraTurn: 50, aid: 45 };
+// Attaque = rapport × défenses : 2 pour les supports, 3 pour les attaquants, l'avant-garde et le personnage principal.
+export const ATK_RATIO = { vanguard: 3, assaulter: 3, main: 3, supporter: 2 };
 export const RULES = { applyBaseLine: true, selfStatsInPanel: false };
 
 // Génome : { v: id|null, a: [ids] (0 à 2, le personnage principal est toujours là), s: [ids], nat: {id: nature}, mainType, eq?: {id: {gear, acc}} }
 export function toTeam(g, name = 'F', statScale = null) {
   const members = [];
-  const stats = () => {
-    const base = { ...BASE };
+  const stats = (role) => {
+    const base = { ...BASE, atk: BASE.pdef * ATK_RATIO[role] };
     // facteur (× f) ou décalage ({ add: n })
     if (statScale) for (const [k, f] of Object.entries(statScale)) {
       if (typeof f === 'object') base[k] = (base[k] || 0) + f.add;
