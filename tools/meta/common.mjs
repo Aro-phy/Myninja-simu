@@ -42,7 +42,7 @@ export function toTeam(g, name = 'F', statScale = null) {
     return equipmentEntries(slotsToChoice({ gear: Array.isArray(e.gear) ? e.gear : Array(6).fill(e.gear), acc }));
   };
   if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats(g.v), nature: g.nat[g.v], natureLevel: 3, equipment: eq(g.v) });
-  members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main') });
+  members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main'), mainTalents: g.mainTalents });
   g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
   g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
   return { name, members };
