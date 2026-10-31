@@ -17,6 +17,7 @@ combat au tour par tour selon la vitesse, journal détaillé et taux de victoire
 | `describe.js` | Retraduit une fiche en français pour vérifier la transcription |
 | `index.html`, `app.js` | Interface web |
 | `formation-file.js` | Fichier d'une formation (JSON lisible : ninjas, stats, équipements), téléchargé et réimporté par la page |
+| `tools/meta/` | Recherche de formations PvP : `search.mjs` (évolution, avec natures et équipement), `final.mjs` (tournoi et sensibilité aux stats), `equip.mjs` (choix des sets) |
 | `ocr.js`, `vendor/tesseract/` | « Lire une capture des stats » : lecture de l'écran des stats du ninja (tesseract.js, hébergé avec le site) |
 
 ## Lancer en local
