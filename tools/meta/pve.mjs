@@ -13,7 +13,7 @@ import { NINJAS } from '../../data.js';
 import { toTeam, RULES } from './common.mjs';
 
 export const PVE = {
-  hpMult: Number(process.env.PVE_HP || 10),        // PV : × la base de test (450 000)
+  hpMult: Number(process.env.PVE_HP || 4),        // PV : × la base de test (450 000) ; ×4 ≈ 1,15 × les PV moyens de Lava X1, comme en jeu
   ccRate: Number(process.env.PVE_CC || 200),       // taux de contrôle
   atk: Number(process.env.PVE_ATK || 8000000),      // attaque
   def: Number(process.env.PVE_DEF || 20000000),      // défenses physique et stratégique
