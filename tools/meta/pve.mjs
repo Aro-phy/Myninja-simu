@@ -5,6 +5,7 @@
 // Le joueur gagne seulement s'il tue les 5 ennemis avant la fin des 20 rounds.
 // Réglages calibrés sur Lava X1 en jeu : morte en 2 à 3 rounds, Warrior Sakura à 0 dégât direct, supports ennemis qui enchaînent les Tour Bonus.
 import { simulate, resolveKit } from '../../engine.js';
+import { STATUSES } from '../../statuses.js';
 import { NINJAS } from '../../data.js';
 import { toTeam, RULES } from './common.mjs';
 
@@ -18,6 +19,14 @@ export const PVE = {
 };
 const POOL = NINJAS.filter((n) => !n.isMain);
 const ROLES = ['vanguard', 'assaulter', 'supporter'];
+// Tous les états qui empêchent d'agir (CC du wiki, Poisonous Wind, Chaos, Charm…) : les ennemis PvE y sont immunisés.
+const CC_IDS = Object.entries(STATUSES).filter(([, d]) => d.type === 'cc').map(([id]) => id);
+// Les ennemis PvE encaissent très bien les coups directs et jouent toujours en premier : leur défense ne peut pas être
+// réduite (talents, Armor Break, Weaken DEF, ignore défense), et aucun malus ne peut ralentir leur vitesse.
+const PVE_TALENTS = [
+  { to: 'self', mods: [{ stat: 'defCutRes', value: 100 }, { stat: 'immuneIgnoreDef', value: 1e6 }, { stat: 'immuneWeakenDef', value: 1e6 }, { stat: 'speed', value: 1e6 }] },
+  { immune: CC_IDS },
+];
 
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -32,7 +41,7 @@ export function pveTeam(k) {
     const role = ROLES[Math.floor(r() * 3)];
     const ninja = {
       id: `pve-${k}-${i}`, name: `Ennemi ${i + 1} (spéciale de ${n.name})`, role, gender: n.gender, tags: n.tags,
-      talents: kit.talents.filter((p) => p.immune?.length).map((p) => ({ immune: p.immune })),
+      talents: [...kit.talents.filter((p) => p.immune?.length).map((p) => ({ immune: p.immune })), ...PVE_TALENTS],
       special: kit.special, normal: kit.normal,
     };
     members.push({
