@@ -21,6 +21,7 @@ export const DEFAULT_RULES = {
   applyBaseLine: false,    // ajouter la ligne de base du talent (vitesse/Dégâts/Absorption propres) aux stats saisies
   selfStatsInPanel: true,  // les bonus fixes « self » sur des stats visibles à l'écran du ninja y sont déjà inclus
   roleFallback: true,      // une attaque sur un poste vide (ex. « les supports ») vise la première ligne à la place
+  disabledStatsA: [],      // stats sans effet pour la formation A (ex. PvE : s.block, s.crit, dégâts finaux…)
 };
 
 export const ROWS = { vanguard: 'V', assaulter: 'A', supporter: 'S' };
@@ -176,6 +177,7 @@ function allMods(u, stat) {
 function addPassive(u, p) { (u.passives[p.stat] ||= []).push(p); }
 // Somme des modificateurs d'une stat (version sans allocation : appelée très souvent).
 function modSum(u, stat) {
+  if (u.disabled?.has(stat)) return 0;
   let sum = 0;
   const ps = u.passives[stat];
   if (ps) for (const p of ps) if (!(p.hpBelow && 100 * u.hp / u.maxHp >= p.hpBelow)) sum += p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
@@ -185,7 +187,7 @@ function modSum(u, stat) {
 const hasFlag = (u, flag) => u.effects.some((e) => e.flags && e.flags[flag]);
 // Buff de la cible pris en compte contre cet attaquant : un attaquant immunisé à ce buff l'ignore.
 const hasFlagVs = (u, flag, att) => u.effects.some((e) => e.flags && e.flags[flag] && !(att && att.immune.has(e.id)));
-const stat = (u, s) => (u.stats[s] || 0) + modSum(u, s);
+const stat = (u, s) => (u.disabled?.has(s) ? 0 : (u.stats[s] || 0) + modSum(u, s));
 
 function atkParts(u, type = u.attackType) {
   const key = type === 'magic' ? 'matk' : 'patk';
@@ -316,6 +318,7 @@ export function simulate(teamA, teamB, opts = {}) {
     ...teamA.members.map((m, i) => makeUnit(m, 0, i)),
     ...teamB.members.map((m, i) => makeUnit(m, 1, i)),
   ];
+  if (rules.disabledStatsA?.length) { const off = new Set(rules.disabledStatsA); for (const u of units) if (u.team === 0) u.disabled = off; }
   const teamNames = [teamA.name || 'Formation A', teamB.name || 'Formation B'];
   let round = 0;
   let current = null; // unité dont c'est le tour (pour la gestion des durées)

@@ -54,6 +54,10 @@ export function pveTeam(k) {
   return { name: `PvE ${k}`, members };
 }
 
+// Wiki : en PvE, ces stats du joueur sont sans effet (s.block, s.crit, dégâts finaux en plus ou en moins,
+// résistance à l'ignore défense).
+export const PVE_RULES = { ...RULES, disabledStatsA: ['sBlock', 'sCrit', 'finalDmg', 'finalReduction', 'immuneIgnoreDef'] };
+
 // Résultat d'une formation joueur (génome) contre les formations PvE 0..K-1, n combats chacune.
 // score = victoires + 0,3 × part moyenne des PV ennemis retirés (pour départager quand personne ne gagne).
 export function pveScore(g, K, n, seed = 1) {
@@ -62,7 +66,7 @@ export function pveScore(g, K, n, seed = 1) {
   for (let k = 0; k < K; k++) {
     const foe = pveTeam(k);
     for (let i = 0; i < n; i++) {
-      const r = simulate(me, foe, { seed: seed + k * 1000 + i, log: false, rules: RULES });
+      const r = simulate(me, foe, { seed: seed + k * 1000 + i, log: false, rules: PVE_RULES });
       if (r.winner === 0 && !r.timeout) wins++;
       const foes = r.units.filter((u) => u.team === 1);
       dmg += foes.reduce((a, u) => a + (u.maxHp - Math.max(0, u.hp)), 0) / foes.reduce((a, u) => a + u.maxHp, 0);
