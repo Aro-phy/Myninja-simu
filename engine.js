@@ -809,7 +809,7 @@ export function simulate(teamA, teamB, opts = {}) {
     while (!over()) {
       const ready = units.filter((u) => u.alive && !acted.has(u));
       if (!ready.length) break;
-      let best = null, bestSpd = -1;
+      let best = null, bestSpd = -Infinity; // une vitesse négative (gros malus) joue en dernier, mais joue
       for (const u of ready) {
         const s = currentSpeed(u);
         if (s > bestSpd || (s === bestSpd && rng() < 0.5)) { best = u; bestSpd = s; }
