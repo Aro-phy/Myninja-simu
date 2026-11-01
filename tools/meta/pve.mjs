@@ -3,7 +3,8 @@
 // hasard, à un poste tiré au hasard ; 5 ennemis, sans personnage principal. Ils sont immunisés au contrôle (pas aux
 // autres debuffs), ont un fort taux de contrôle, beaucoup de PV, de l'Absorption, et jouent toujours en premier.
 // Le joueur gagne seulement s'il tue les 5 ennemis avant la fin des 20 rounds.
-// Réglages calibrés sur Lava X1 en jeu : morte en 2 à 3 rounds, Warrior Sakura à 0 dégât direct, supports ennemis qui enchaînent les Tour Bonus.
+// Réglages calibrés sur Lava X1 en jeu : morte en 2 à 3 rounds, Warrior Sakura à 0 dégât direct, supports ennemis qui
+// enchaînent les Tour Bonus ; Dégâts 650 pour que leurs coups directs passent l'Absorption des joueurs (environ 300 à 500).
 import { simulate, resolveKit } from '../../engine.js';
 import { STATUSES } from '../../statuses.js';
 import { NINJAS } from '../../data.js';
@@ -12,10 +13,10 @@ import { toTeam, RULES } from './common.mjs';
 export const PVE = {
   hpMult: Number(process.env.PVE_HP || 10),        // PV : × la base de test (450 000)
   ccRate: Number(process.env.PVE_CC || 200),       // taux de contrôle
-  atk: Number(process.env.PVE_ATK || 6000000),      // attaque
+  atk: Number(process.env.PVE_ATK || 4000000),      // attaque
   def: Number(process.env.PVE_DEF || 20000000),      // défenses physique et stratégique
   extraTurn: Number(process.env.PVE_PUNCH || 100),  // Tour Bonus
-  dr: 250, air: 300,
+  dr: Number(process.env.PVE_DR || 650), air: 300,
 };
 const POOL = NINJAS.filter((n) => !n.isMain);
 const ROLES = ['vanguard', 'assaulter', 'supporter'];
