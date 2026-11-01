@@ -5,6 +5,8 @@
 // Le joueur gagne seulement s'il tue les 5 ennemis avant la fin des 20 rounds.
 // Réglages calibrés sur Lava X1 en jeu : morte en 2 à 3 rounds, Warrior Sakura à 0 dégât direct, supports ennemis qui
 // enchaînent les Tour Bonus ; Dégâts 650 pour que leurs coups directs passent l'Absorption des joueurs (environ 300 à 500).
+// En jeu, les joueurs meurent sous de gros coups directs : pas de pénétration ennemie, et le bloodline des joueurs les
+// immunise aux DoT ennemis.
 import { simulate, resolveKit } from '../../engine.js';
 import { STATUSES } from '../../statuses.js';
 import { NINJAS } from '../../data.js';
@@ -13,7 +15,7 @@ import { toTeam, RULES } from './common.mjs';
 export const PVE = {
   hpMult: Number(process.env.PVE_HP || 10),        // PV : × la base de test (450 000)
   ccRate: Number(process.env.PVE_CC || 200),       // taux de contrôle
-  atk: Number(process.env.PVE_ATK || 4000000),      // attaque
+  atk: Number(process.env.PVE_ATK || 6000000),      // attaque
   def: Number(process.env.PVE_DEF || 20000000),      // défenses physique et stratégique
   extraTurn: Number(process.env.PVE_PUNCH || 100),  // Tour Bonus
   dr: Number(process.env.PVE_DR || 650), air: 300,
@@ -39,11 +41,14 @@ export function pveTeam(k) {
   for (let i = 0; i < 5; i++) {
     let n; do { n = POOL[Math.floor(r() * POOL.length)]; } while (used.has(n.id)); used.add(n.id);
     const kit = resolveKit(n);
+    // en PvE, les ennemis tuent par de gros coups directs : leurs spéciales gardent buffs / debuffs mais pas la pénétration
+    const noPen = (effects = []) => effects.filter((e) => !e.penetration).map((e) => (e.oneOf ? { ...e, oneOf: e.oneOf.map(noPen) } : e));
+    const special = kit.special && { ...kit.special, effects: noPen(kit.special.effects) };
     const role = ROLES[Math.floor(r() * 3)];
     const ninja = {
       id: `pve-${k}-${i}`, name: `Ennemi ${i + 1} (spéciale de ${n.name})`, role, gender: n.gender, tags: n.tags,
       talents: [...kit.talents.filter((p) => p.immune?.length).map((p) => ({ immune: p.immune })), ...PVE_TALENTS],
-      special: kit.special, normal: kit.normal,
+      special, normal: kit.normal,
     };
     members.push({
       ninja, pos: members.filter((m) => m.ninja.role === role).length, nature: 'none',
@@ -59,11 +64,17 @@ export function pveTeam(k) {
 // résistance à l'ignore défense).
 export const PVE_RULES = { ...RULES, disabledStatsA: ['sBlock', 'sCrit', 'finalDmg', 'finalReduction', 'immuneIgnoreDef'] };
 
+// Formation joueur en PvE : stats de test, plus un bloodline qui l'immunise aux DoT ennemis.
+export function pvePlayer(g, name = 'Joueur') {
+  const t = toTeam(g, name);
+  return { ...t, members: t.members.map((m) => ({ ...m, stats: { ...m.stats, bloodline: 1e5 } })) };
+}
+
 // Résultat d'une formation joueur (génome) contre les formations PvE 0..K-1, n combats chacune.
 // score = victoires + 0,3 × part moyenne des PV ennemis retirés (pour départager quand personne ne gagne).
 export function pveScore(g, K, n, seed = 1) {
   let wins = 0, dmg = 0, games = 0;
-  const me = toTeam(g, 'Joueur');
+  const me = pvePlayer(g);
   for (let k = 0; k < K; k++) {
     const foe = pveTeam(k);
     for (let i = 0; i < n; i++) {
