@@ -1,3 +1,8 @@
+// La Puissance (qui donne les PV en jeu) n'est pas convertie : sans elle, les PV de test sont environ 4,7 fois trop
+// faibles face à l'attaque (médiane PV / attaque en combat : 14,6 sur Lava X1, Skalypan et Hashirama avec leurs vraies
+// stats, contre 3,1 avec les stats de test). Les PV de test sont donc multipliés par HP_SCALE.
+export const HP_SCALE = Number(process.env.HP_SCALE || 4.7);
+
 // Stats de test d'un ninja, à partir de stats brutes (Force, Chakra, Agilité) selon son poste, son ancienneté et son type,
 // plus les stats brutes de son équipement. Conversion : Force → attaque physique ×2 et défense physique ×1,
 // Chakra → attaque magique ×2 et défense magique ×1, Agilité → vitesse ×2, Endurance → PV ×5.
@@ -124,7 +129,7 @@ export function testStats(id, eq, mainType = 'physical', common = {}) {
   const magic = role === 'supporter' || (id === 'main' && mainType === 'magic');
   return {
     ...common,
-    hp: r.hp + 5 * e.endurance,
+    hp: HP_SCALE * (r.hp + 5 * e.endurance),
     atk: (magic ? 2 * chakra : 2 * force) + (magic ? e.matkPiece || 0 : e.patkPiece || 0),
     pdef: force + e.pdef, mdef: chakra + e.mdef,
     speed: 2 * agility + e.speed,
