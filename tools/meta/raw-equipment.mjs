@@ -27,7 +27,7 @@ export const GEAR_PIECE = {
   'gear-deatbone': { atk: 28000, pdef: 26000, mdef: 30000 }, 'gear-corruptor': { atk: 26000, pdef: 24000, mdef: 28000 },
   'gear-oblivion': { atk: 24000, pdef: 22000, mdef: 26000 }, 'gear-stormrage': { atk: 22000, pdef: 20000, mdef: 24000 },
   'gear-frost-fire': { atk: 20000, pdef: 18000, mdef: 22000 },
-  'gear-defiance': 73000, 'gear-black-feather': 72000, 'gear-warlord': 66000, 'gear-warlord-r5': 66000, // pièce R5 inconnue : comme R4
+  'gear-defiance': 73000, 'gear-black-feather': 72000, 'gear-warlord': 66000, 'gear-warlord-r5': 71000,
 };
 
 const a = (agility) => ({ agility });
@@ -106,7 +106,7 @@ export const ACC_PIECE = {
   'acc-hyuga': { force: 48000, chakra: 48000, agility: 50000 }, 'acc-uchiha': { force: 47000, chakra: 47000, agility: 49000 },
   'acc-saint': 40000, 'acc-senju': { force: 46000, chakra: 46000, agility: 48000 }, 'acc-ashura': { force: 45000, chakra: 45000, agility: 47000 },
   'acc-indora': { force: 43000, chakra: 43000, agility: 45000 }, 'acc-bloodfang': { force: 43000, chakra: 43000, agility: 44000 },
-  'acc-otsutsuki': 42000, 'acc-warlord-r2': 65000, 'acc-heroism': { force: 40000, chakra: 40000, agility: 42000 }, 'acc-devout': { force: 34000, chakra: 34000, agility: 38000 },
+  'acc-otsutsuki': 42000, 'acc-warlord': 60000, 'acc-warlord-r2': 65000, 'acc-heroism': { force: 40000, chakra: 40000, agility: 42000 }, 'acc-devout': { force: 34000, chakra: 34000, agility: 38000 },
 };
 export const ACC_PAIR = {
   'acc-pain': { force: { force: 30000, agility: 30000 }, chakra: { chakra: 30000, agility: 30000 } },
