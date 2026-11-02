@@ -6,7 +6,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { parseFormationFile } from '../../formation-file.js';
 
-const dir = new URL('./references/', import.meta.url);
+// REF_DIR=/chemin : lit les fiches d'un autre dossier (par exemple des formations gardées hors du dépôt).
+const dir = process.env.REF_DIR ? new URL(`file://${process.env.REF_DIR.replace(/\/?$/, '/')}`) : new URL('./references/', import.meta.url);
 
 // Formation du simulateur ({ name, slots }) → génome de la recherche.
 function toGenome({ name, slots }) {

@@ -203,6 +203,11 @@ export const GEAR_SETS_2 = [
     4: [self(m('weakenDef', 45), m('weakenAtk', 50), m('hp', 30), m('ccRate', 3), m('ccRes', 3))], // + Agilité 20 000
     6: [self(m('dr', 70), m('air', 50), m('atk', 30), m('ccRate', 5), m('ccRes', 5))], // + Agilité 20 000, Puissance 120 000
   } },
+  { id: 'gear-warlord-r5', name: 'Warlord [R5]', tiers: {
+    2: [self(m('aid', 25), m('punch', 30))], // + Force / Agilité / Chakra 18 000, Puissance 35 000
+    4: [self(m('weakenDef', 45), m('weakenAtk', 50), m('hp', 30), m('ccRate', 5), m('ccRes', 5))], // + Agilité 23 000
+    6: [self(m('dr', 75), m('air', 50), m('atk', 35), m('ccRate', 8), m('ccRes', 8))], // + Agilité 20 000, Puissance 120 000
+  } },
 ];
 
 export const ACCESSORY_SETS_2 = [
@@ -344,7 +349,7 @@ export const ACCESSORY_SETS_2 = [
     p('force', self(m('air', 25), m('atk', 20))),
     p('chakra', self(m('dr', 25), m('def', 20))),
     p('agility', self(m('dr', 20), m('hp', 20))),
-    p('power', self(m('air', 20), m('weakenAtk', 20))),
+    p('power', self(m('air', 20), m('ccRes', 20))), // Puissance 450 000
   ], full: [self(m('ccRes', 40))] },
   { id: 'acc-bloodfang', name: 'Accessoires Bloodfang', pairs: [
     p('force', self(m('finalDmg', 25))),
@@ -390,4 +395,18 @@ export const ACCESSORY_SETS_2 = [
     p('agility', self(m('atk', 25), m('air', 25), m('ccRate', 10))), // + Agilité 40 000
     p('power', self(m('hp', 30), m('ccRate', 30), m('finalReduction', 5))), // + Puissance 90 000
   ], full: [self(m('weakenAtk', 30), m('weakenDef', 30), m('air', 25), m('dr', 25), m('ccRes', 30), m('finalDmg', 5), m('hp', 5))] },
+  // Accessoires Warlord R2 (pièce 65 000, Puissance 650 000).
+  { id: 'acc-warlord-r2', name: 'Accessoires Warlord [R2]', pairs: [
+    p('force', self(m('atk', 25), m('ccRes', 40), m('air', 5), m('finalDmg', 5))), // + Force 55 000
+    p('chakra', self(m('atk', 25), m('dr', 30), m('finalReduction', 5))), // + Chakra 55 000
+    p('agility', self(m('atk', 15), m('air', 30), m('finalDmg', 5), m('ccRate', 25))), // + Agilité 55 000
+    p('power', self(m('hp', 30), m('ccRate', 30), m('finalReduction', 5), m('dr', 5))), // + Puissance 105 000
+  ], full: [self(m('weakenAtk', 30), m('weakenDef', 30), m('air', 30), m('dr', 25), m('ccRes', 30), m('finalDmg', 5), m('hp', 10), m('atk', 10))] },
+  // Accessoires Deatbone : seule la paire Force est connue.
+  { id: 'acc-deatbone', name: 'Accessoires Deatbone', pairs: [
+    p('force', self(m('air', 30), m('ccRes', 30))),
+    p('chakra'),
+    p('agility'),
+    p('power'),
+  ], full: [] },
 ];
