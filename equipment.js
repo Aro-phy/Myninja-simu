@@ -55,7 +55,7 @@ export const GEAR_SETS = [
     tiers: {
       2: [self(m('hp', 30), m('air', 40))],
       4: [self(m('dr', 45), m('atk', 30)), afterSkill({ to: rand('enemy', 2), cleanse: 'buff' })],
-      6: [self(m('weakenAtk', 30), m('air', 30)), afterSkill(together(75, st(role('ally', 'supporter'), 'superarmor', 2, C)))],
+      6: [self(m('weakenAtk', 30), m('air', 30)), afterSkill(together(70, st(role('ally', 'supporter'), 'superarmor', 2, C)))],
     },
   },
   {
