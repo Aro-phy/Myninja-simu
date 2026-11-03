@@ -1,5 +1,6 @@
 // Outils communs à la recherche de formations « méta » : stats types, génome d'une formation, évaluation.
-import { simulate } from '../../engine.js';
+import { simulate, resolveKit } from '../../engine.js';
+import { STATUSES } from '../../statuses.js';
 import { NINJAS } from '../../data.js';
 import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, slotsToChoice } from '../../equipment.js';
 import { testStats, RELEASES } from './ninja-stats.mjs';
@@ -49,7 +50,46 @@ export function toTeam(g, name = 'F', statScale = null) {
   members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main'), mainTalents: g.mainTalents });
   g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
   g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
+  if (ADJUST) focusStats(members);
   return { name, members };
+}
+
+// En jeu, les joueurs concentrent leurs ressources : la vitesse sur le support de contrôle, l'attaque sur leur
+// meilleur attaquant. Stats de test ajustées dans ce sens (ADJUST=0 pour désactiver) :
+// - le support de contrôle (sa spéciale pose un contrôle aux ennemis ; le plus rapide s'il y en a plusieurs) : vitesse × 2 ;
+// - le ninja à la plus forte attaque : attaque +5 % et Dégâts +5 ; tous les autres : attaque −5 % et Dégâts −5.
+const ADJUST = process.env.ADJUST !== '0';
+const isCc = (id) => STATUSES[id]?.type === 'cc';
+const flat = (effects = []) => effects.flatMap((e) => (e.oneOf ? e.oneOf.flatMap(flat) : [e]));
+export const ccSupport = (n) => n.role === 'supporter' && flat(resolveKit(n).special?.effects)
+  .some((e) => isCc(e.status) && (e.to?.side === 'enemy' || typeof e.to === 'string' && /enemy|target/.test(e.to)));
+function focusStats(members) {
+  const cc = members.filter((m) => ccSupport(m.ninja)).sort((a, b) => b.stats.speed - a.stats.speed)[0];
+  if (cc) cc.stats = { ...cc.stats, speed: cc.stats.speed * 2 };
+  const top = [...members].sort((a, b) => b.stats.atk - a.stats.atk)[0];
+  for (const m of members) {
+    const up = m === top ? 1 : -1;
+    m.stats = { ...m.stats, atk: m.stats.atk * (1 + 0.05 * up), dr: (m.stats.dr || 0) + 5 * up };
+  }
+}
+
+// Natures qui profitent au maximum des bonus de nature des talents de la formation (ids : ninjas hors personnage
+// principal). Score = nombre de bonus de talent (ou d'éveil) réservés à certaines natures que reçoivent les alliés ;
+// à égalité, on préfère le plus de ninjas de même nature.
+export function bestNatures(ids) {
+  const kits = ids.map((id) => resolveKit(byId[id]));
+  const allyNat = kits.flatMap((k) => k.talents.filter((t) => t.to?.side === 'ally' && t.to.nature)
+    .map((t) => ({ nat: [].concat(t.to.nature), role: t.to.role && [].concat(t.to.role), w: t.mods?.length || 1 })));
+  let best = null;
+  const combo = Array(ids.length).fill(0);
+  for (let c = 0; c < 5 ** ids.length; c++) {
+    let x = c; for (let i = 0; i < ids.length; i++) { combo[i] = x % 5; x = Math.floor(x / 5); }
+    let score = 0;
+    ids.forEach((id, i) => { for (const t of allyNat) if (t.nat.includes(NATURE_LIST[combo[i]]) && (!t.role || t.role.includes(byId[id].role))) score += t.w; });
+    const same = Math.max(...NATURE_LIST.map((_, k) => combo.filter((v) => v === k).length));
+    if (!best || score > best.score || (score === best.score && same > best.same)) best = { score, same, nat: combo.map((v) => NATURE_LIST[v]) };
+  }
+  return Object.fromEntries(ids.map((id, i) => [id, best.nat[i]]));
 }
 
 // Taux de victoire de A contre B sur n combats (moitié côté A, moitié côté B, graines différentes).
