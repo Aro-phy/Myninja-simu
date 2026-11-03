@@ -106,9 +106,8 @@ export const ACC_PIECE = {
   'acc-hyuga': { force: 48000, chakra: 48000, agility: 50000 }, 'acc-uchiha': { force: 47000, chakra: 47000, agility: 49000 },
   'acc-saint': 40000, 'acc-senju': { force: 46000, chakra: 46000, agility: 48000 }, 'acc-ashura': { force: 45000, chakra: 45000, agility: 47000 },
   'acc-indora': { force: 43000, chakra: 43000, agility: 45000 }, 'acc-bloodfang': { force: 43000, chakra: 43000, agility: 44000 },
-  // Estimations (valeurs inconnues) : interpolées d'après la valeur des pièces d'équipement du même set.
-  'acc-defiance': 64000, 'acc-violet': 63500, 'acc-black-feather': 63000,
-  'acc-darkmantle': 29000, 'acc-deatbone': 27000, 'acc-corruptor': 25000,
+  'acc-defiance': 64000, 'acc-violet': 63500, 'acc-black-feather': 63000, // 3e vidéo
+  'acc-darkmantle': 30000, 'acc-deatbone': 30000, 'acc-corruptor': 30000, // environ (donné par le joueur)
   'acc-otsutsuki': 42000, 'acc-warlord': 60000, 'acc-warlord-r2': 65000, 'acc-heroism': { force: 40000, chakra: 40000, agility: 42000 }, 'acc-devout': { force: 34000, chakra: 34000, agility: 38000 },
 };
 export const ACC_PAIR = {
