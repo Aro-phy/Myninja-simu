@@ -177,7 +177,7 @@ function allMods(u, stat) {
   for (const p of u.passives[stat] || []) {
     if (p.hpBelow && 100 * u.hp / u.maxHp >= p.hpBelow) continue;
     const v = p.scaleSrc ? p.value * Math.floor(lostPct(p.scaleSrc) / p.per) : p.value;
-    if (v) out.push({ value: v, kind: p.kind || 'talent' });
+    if (v) out.push({ value: v, kind: p.kind || 'talent', source: p.source });
   }
   for (const e of u.effects) for (const m of e.mods || []) if (m.stat === stat) out.push({ value: m.value, kind: m.kind || 'icon' });
   return out;
@@ -383,7 +383,7 @@ export function simulate(teamA, teamB, opts = {}) {
       uid: u.uid, team: u.team, name: u.name, role: u.role,
       mods: Object.fromEntries(INSPECT_STATS.map((k) => [k, modSum(u, k)])),
       // attaque et défense : les talents se multiplient, la liste détaillée sert à les recalculer
-      lists: Object.fromEntries(['atk', 'patk', 'matk', 'def', 'pdef', 'mdef'].map((k) => [k, allMods(u, k)])),
+      lists: Object.fromEntries(['atk', 'patk', 'matk', 'def', 'pdef', 'mdef', 'ccRate', 'ccRes'].map((k) => [k, allMods(u, k)])),
       immune: [...u.immune],
     }));
   }
