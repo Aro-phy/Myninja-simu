@@ -76,16 +76,24 @@ export function validateTeam(team) {
 }
 
 // Talents et compétences effectifs d'un ninja selon son niveau d'éveil.
-export function resolveKit(ninja, level) {
-  const aw = ninja.awakenings || [];
-  const lvl = Math.min(level ?? aw.length, aw.length);
+// Deux sortes d'éveil : l'éveil de talent (niveaux successifs) et l'éveil de compétence, indépendant, qui ne
+// modifie que la spéciale.
+export const isSkillAwakening = (a) => !!a && (a.skill || /^Éveil de (la )?compétence/i.test(a.name || ''));
+export const talentAwakenings = (n) => (n.awakenings || []).filter((a) => !isSkillAwakening(a));
+export const skillAwakenings = (n) => (n.awakenings || []).filter(isSkillAwakening);
+
+// level : niveau d'éveil de talent (par défaut le dernier) ; skill : éveil de compétence appliqué (par défaut oui).
+export function resolveKit(ninja, level, skill = true) {
+  const tal = talentAwakenings(ninja);
+  const lvl = Math.min(level ?? tal.length, tal.length);
+  const aw = [...tal.slice(0, lvl), ...(skill === false ? [] : skillAwakenings(ninja))];
   let awTalents = [];
   const extraEffects = [];
   const extraHits = [];
   let special = ninja.special;
   let base = ninja.base;
   let replacedHits = null;
-  for (let i = 0; i < lvl; i++) {
+  for (let i = 0; i < aw.length; i++) {
     const a = aw[i];
     if (a.base) base = a.base;
     if (a.replacePrevious) awTalents = [];
@@ -129,7 +137,7 @@ export function baseAttack(stats = {}) {
 
 function makeUnit(member, team, index) {
   const n = member.ninja;
-  let kit = resolveKit(n, member.awakening);
+  let kit = resolveKit(n, member.awakening, member.skillAwakening);
   if (n.isMain && member.mainTalents?.length) kit = { ...kit, talents: [...kit.talents, ...mainTalentEntries(member.mainTalents)] };
   return {
     uid: `${team}-${index}`,
@@ -374,6 +382,8 @@ export function simulate(teamA, teamB, opts = {}) {
     return units.map((u) => ({
       uid: u.uid, team: u.team, name: u.name, role: u.role,
       mods: Object.fromEntries(INSPECT_STATS.map((k) => [k, modSum(u, k)])),
+      // attaque et défense : les talents se multiplient, la liste détaillée sert à les recalculer
+      lists: Object.fromEntries(['atk', 'patk', 'matk', 'def', 'pdef', 'mdef'].map((k) => [k, allMods(u, k)])),
       immune: [...u.immune],
     }));
   }

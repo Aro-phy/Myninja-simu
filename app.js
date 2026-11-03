@@ -1,4 +1,4 @@
-import { simulate, simulateMany, inspect, validateTeam, resolveKit, baseAttack, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
+import { simulate, simulateMany, inspect, validateTeam, resolveKit, talentAwakenings, skillAwakenings, baseAttack, DEFAULT_RULES, ROLE_LABEL, NATURES } from './engine.js';
 import { NINJAS, SAMPLE_STATS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
 import * as D from './describe.js';
@@ -112,7 +112,7 @@ function toTeam(t) {
       ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: withAtk(m.stats), label: m.label || undefined,
       attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
       mainTalents: byId[m.ninjaId].isMain ? m.mainTalents : undefined,
-      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening,
+      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening, skillAwakening: m.skillAwakening,
       equipment: equipmentEntries(slotsToChoice(m.equip || choiceToSlots(m.gear))),
     });
   }
@@ -165,10 +165,11 @@ function renderTeam(ti) {
 
 // ---------- Fiche d'un ninja ----------
 
-function kitView(n, level) {
-  const kit = resolveKit(n, level);
+function kitView(n, level, skill) {
+  const kit = resolveKit(n, level, skill);
   const section = (title, items) => (items.length ? el('div', { class: 'kit-sec' }, el('div', { class: 'col-label' }, title), el('ul', {}, items.map((t) => el('li', {}, t)))) : null);
-  const aw = (n.awakenings || []).map((a, i) => `${i < kit.level ? '✔' : '✘'} ${a.name}${a.replacePrevious ? ' (remplace l\'éveil précédent)' : ''}`);
+  const aw = [...talentAwakenings(n).map((a, i) => `${i < kit.level ? '✔' : '✘'} ${a.name}${a.replacePrevious ? ' (remplace l\'éveil précédent)' : ''}`),
+    ...skillAwakenings(n).map((a) => `${skill === false ? '✘' : '✔'} ${a.name} (éveil de compétence)`)];
   return el('div', { class: 'kit' },
     n.base ? el('div', { class: 'note' }, `Ligne de base : vitesse ${n.base.speed ?? 0} %, Dégâts ${n.base.dr ?? 0} %, Absorption ${n.base.air ?? 0} % (considérée comme déjà incluse dans les stats saisies).`) : null,
     section('Talents actifs', kit.talents.map(D.talent).filter(Boolean)),
@@ -515,10 +516,13 @@ function openEditor(ti, key) {
         n.isMain ? null : el('label', { class: 'field', for: 'f-nlvl' }, 'Niveau de nature',
           el('input', { type: 'number', id: 'f-nlvl', min: 1, max: 30, value: draft.natureLevel || 1,
             oninput: (e) => { draft.natureLevel = Math.max(1, Math.round(parseNum(e.target.value))); } })),
-        n.awakenings?.length ? el('label', { class: 'field', for: 'f-aw' }, 'Niveau d\'éveil',
+        talentAwakenings(n).length ? el('label', { class: 'field', for: 'f-aw' }, 'Éveil de talent',
           el('select', { id: 'f-aw', onchange: (e) => { draft.awakening = Number(e.target.value); render(); } },
-            Array.from({ length: n.awakenings.length + 1 }, (_, i) => el('option', { value: i, selected: (draft.awakening ?? n.awakenings.length) === i }, i === 0 ? 'Aucun' : `${i} · ${n.awakenings[i - 1].name}`)))) : null) : null,
-      n ? el('details', { class: 'skill-desc' }, el('summary', {}, 'Talents et compétences (vérifier la transcription)'), kitView(n, draft.awakening)) : null,
+            Array.from({ length: talentAwakenings(n).length + 1 }, (_, i) => el('option', { value: i, selected: Math.min(draft.awakening ?? 99, talentAwakenings(n).length) === i }, i === 0 ? 'Aucun' : `${i} · ${talentAwakenings(n)[i - 1].name}`)))) : null,
+        skillAwakenings(n).length ? el('label', { class: 'field' },
+          el('input', { type: 'checkbox', checked: draft.skillAwakening !== false, onchange: (e) => { draft.skillAwakening = e.target.checked; render(); } }),
+          ' Éveil de compétence') : null) : null,
+      n ? el('details', { class: 'skill-desc' }, el('summary', {}, 'Talents et compétences (vérifier la transcription)'), kitView(n, draft.awakening, draft.skillAwakening)) : null,
       n?.isMain ? el('label', { class: 'field', for: 'f-type' }, 'Type d\'attaque',
         el('select', { id: 'f-type', onchange: (e) => { draft.attackType = e.target.value; } },
           el('option', { value: 'physical', selected: draft.attackType !== 'magic' }, 'Physique'),

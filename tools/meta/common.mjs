@@ -28,6 +28,10 @@ export const BASE = { fury: 100, dr: 200, air: 200, hit: 300, dodge: 50, crit: 8
 export const RULES = { applyBaseLine: true, selfStatsInPanel: false };
 
 // Génome : { v: id|null, a: [ids] (0 à 2, le personnage principal est toujours là), s: [ids], nat: {id: nature}, mainType, eq?: {id: {gear, acc}} }
+// Éveil de talent utilisé par défaut quand le dernier n'est pas celui que jouent les joueurs (l'éveil de compétence reste appliqué).
+export const AWAKENING = { 'natsu-dragneel': 1 };
+const awk = (g, id) => g.aw?.[id] ?? AWAKENING[id];
+
 export function toTeam(g, name = 'F', statScale = null) {
   const members = [];
   const stats = (id) => {
@@ -46,10 +50,10 @@ export function toTeam(g, name = 'F', statScale = null) {
     const acc = Array.isArray(e.acc) ? e.acc.flatMap((x) => [x, x]) : Array(8).fill(e.acc);
     return equipmentEntries(slotsToChoice({ gear: Array.isArray(e.gear) ? e.gear : Array(6).fill(e.gear), acc }));
   };
-  if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats(g.v), nature: g.nat[g.v], natureLevel: 3, equipment: eq(g.v) });
+  if (g.v) members.push({ ninja: byId[g.v], pos: 0, stats: stats(g.v), nature: g.nat[g.v], natureLevel: 3, awakening: awk(g, g.v), equipment: eq(g.v) });
   members.push({ ninja: byId.main, pos: 0, stats: stats('main'), attackType: g.mainType, equipment: eq('main'), mainTalents: g.mainTalents });
-  g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
-  g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats(id), nature: g.nat[id], natureLevel: 3, equipment: eq(id) }));
+  g.a.forEach((id, i) => members.push({ ninja: byId[id], pos: i + 1, stats: stats(id), nature: g.nat[id], natureLevel: 3, awakening: awk(g, id), equipment: eq(id) }));
+  g.s.forEach((id, i) => members.push({ ninja: byId[id], pos: i, stats: stats(id), nature: g.nat[id], natureLevel: 3, awakening: awk(g, id), equipment: eq(id) }));
   if (ADJUST) focusStats(members);
   return { name, members };
 }

@@ -1,7 +1,7 @@
 // Fichier d'échange d'une formation : JSON lisible (noms en français), relu tel quel à l'import.
 import { NINJAS } from './data.js';
 import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slotsToChoice, choiceToSlots } from './equipment.js';
-import { NATURES, baseAttack } from './engine.js';
+import { NATURES, baseAttack, talentAwakenings, skillAwakenings } from './engine.js';
 
 export const STAT_FIELDS = [
   ['hp', 'Vie'], ['atk', 'Attaque'], ['pdef', 'Def Physique'], ['mdef', 'Def Magique'],
@@ -25,8 +25,9 @@ export function formationToFile(name, slots) {
     const n = m && byId[m.ninjaId];
     if (!n) continue;
     const stats = m.stats?.atk != null ? m.stats : { ...m.stats, atk: baseAttack(m.stats) };
-    const aw = n.awakenings || [];
+    const aw = talentAwakenings(n);
     const level = Math.min(m.awakening ?? aw.length, aw.length);
+    const skillAw = skillAwakenings(n).length ? { eveilCompetence: m.skillAwakening !== false } : {};
     const equip = m.equip || choiceToSlots(m.gear); // anciennes fiches : { set: pièces }
     const gearName = (id) => { const s = GEAR_SETS.find((x) => x.id === id); return s ? shortName(s) : null; };
     const accName = (id) => { const s = ACCESSORY_SETS.find((x) => x.id === id); return s ? shortName(s) : null; };
@@ -40,6 +41,7 @@ export function formationToFile(name, slots) {
         nature: NATURES[m.nature || 'none'], niveauNature: m.natureLevel || 1,
       }),
       ...(aw.length ? { eveil: level, eveilNom: level ? aw[level - 1].name : 'Aucun' } : {}),
+      ...skillAw,
       ...(n.isMain && m.mainTalents?.length ? {
         talentsPrincipal: m.mainTalents.map((t) => ({ cible: t.side === 'enemy' ? 'ennemis' : 'alliés', stat: t.stat, valeur: t.value })),
       } : {}),
@@ -96,7 +98,9 @@ function fileToFormation(f) {
       m.nature = natureKey(x.nature);
       m.natureLevel = Math.max(1, Math.round(Number(x.niveauNature) || 1));
     }
-    if (x.eveil != null && n.awakenings?.length) m.awakening = Math.max(0, Math.min(n.awakenings.length, Math.round(Number(x.eveil) || 0)));
+    const nTal = talentAwakenings(n).length;
+    if (x.eveil != null && nTal) m.awakening = Math.max(0, Math.min(nTal, Math.round(Number(x.eveil) || 0)));
+    if (x.eveilCompetence === false) m.skillAwakening = false;
     slots[k] = m;
   }
   return { name: String(f.formation || 'Formation importée'), slots, warnings: warn };
