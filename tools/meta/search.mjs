@@ -1,7 +1,7 @@
 // Recherche évolutive de formations PvP : chaque génération, les candidats affrontent un groupe d'adversaires
 // (meilleures formations trouvées jusqu'ici + formations au hasard) ; les meilleurs sont gardés et modifiés.
 import { Worker } from 'node:worker_threads';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { POOL, NATURE_LIST, GEAR_IDS, ACC_IDS, key, describe } from './common.mjs';
 import { REFERENCE } from './reference.mjs';
 
@@ -85,8 +85,20 @@ function mutate(g0) {
 
 let pop = Array.from({ length: POP }, randomGenome);
 const hall = [];
+// RESUME=1 : reprend depuis le fichier OUT d'une recherche interrompue (meilleures formations et nombre de générations faites).
+let gen0 = 1;
+if (process.env.RESUME && existsSync(OUT)) {
+  const prev = JSON.parse(readFileSync(OUT, 'utf8'));
+  hall.push(...prev.hall);
+  gen0 = (prev.gen || 0) + 1;
+  const seen = new Set(prev.pop.map(key));
+  pop = [...prev.pop];
+  while (pop.length < POP) { const c = mutate(pop[Math.floor(rnd() * prev.pop.length)]); if (!seen.has(key(c))) { seen.add(key(c)); pop.push(c); } }
+  seed += gen0 * 7919;
+  console.log(`reprise à la génération ${gen0}`);
+}
 const t0 = Date.now();
-for (let gen = 1; gen <= GENS; gen++) {
+for (let gen = gen0; gen <= GENS; gen++) {
   // MODE=meta : les formations sont jugées uniquement contre les formations de référence (le méta actuel du jeu)
   const opponents = process.env.MODE === 'meta' ? REFERENCE
     : [...REFERENCE, ...hall.slice(-12), ...Array.from({ length: Math.max(3, 15 - hall.length) }, randomGenome)];
@@ -102,6 +114,6 @@ for (let gen = 1; gen <= GENS; gen++) {
     if (!seen.has(key(child))) { seen.add(key(child)); next.push(child); }
   }
   pop = next;
-  writeFileSync(OUT, JSON.stringify({ hall, pop: elite }, null, 1));
+  writeFileSync(OUT, JSON.stringify({ hall, pop: elite, gen }, null, 1));
 }
 await Promise.all(workers.map((w) => w.terminate()));
