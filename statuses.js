@@ -31,7 +31,7 @@ export const STATUSES = {
     mods: (v) => [{ stat: 'air', value: v }, { stat: 'block', value: v }, { stat: 'ccRes', value: v }] },
   pyroblast: { name: 'Pyroblast', type: 'buff', cleansable: false, value: 30,
     mods: (v) => [{ stat: 'dr', value: v }, { stat: 'finalDmg', value: v }] },
-  superarmor: { name: 'Superarmor', type: 'buff', cleansable: false, flags: { debuffImmune: true } },
+  superarmor: { name: 'Superarmor', type: 'buff', cleansable: false, flags: { debuffImmune: true, ccImmune: true } }, // ni debuff ni contrôle
   acceleration: { name: 'Acceleration', type: 'buff', cleansable: false, value: 15, mods: (v) => [{ stat: 'speed', value: v, kind: 'icon' }] },
   strong: { name: 'Strong State', type: 'buff', cleansable: false, value: 20,
     mods: (v) => [{ stat: 'air', value: v }, { stat: 'finalReduction', value: v }] },
