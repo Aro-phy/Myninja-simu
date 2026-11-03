@@ -416,7 +416,8 @@ export function simulate(teamA, teamB, opts = {}) {
       id: eff.status || name,
       name,
       type,
-      cleansable: eff.cleansable ?? def.cleansable,
+      // Wiki : un état non dissipable le reste, qu'il vienne d'une compétence ou d'un équipement.
+      cleansable: eff.status && STATUSES[eff.status]?.cleansable === false ? false : (eff.cleansable ?? def.cleansable),
       flags: { ...(def.flags || {}), ...(eff.flags || {}) },
       mods: eff.mods ? eff.mods.map((m) => ({ kind: 'icon', ...m })) : def.mods ? def.mods(value) : [],
       value,
