@@ -19,7 +19,8 @@ const evalCand = (cand, n, seed) => new Promise((resolve, reject) => {
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 const score = (c) => evalCand(c, N, 4242).then(mean);
 
-const ids = ['main', g.v, ...g.a, ...g.s].filter(Boolean);
+// ONLY=id1,id2 : seulement ces ninjas
+const ids = ['main', g.v, ...g.a, ...g.s].filter(Boolean).filter((id) => !process.env.ONLY || process.env.ONLY.split(',').includes(id));
 for (const id of ids) {
   g.eq[id] ||= { gear: GEAR_IDS[0], acc: Array(4).fill(ACC_IDS[0]) };
   if (!Array.isArray(g.eq[id].acc)) g.eq[id].acc = Array(4).fill(g.eq[id].acc);
