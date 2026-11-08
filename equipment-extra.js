@@ -268,10 +268,10 @@ export const ACCESSORY_SETS_2 = [
     p('power', self(m('hp', 25))),
   ], full: [self(m('weakenAtk', 30))] },
   { id: 'acc-sakura', name: 'Accessoires Sakura', pairs: [
-    p('force', self(m('air', 20)), attacked(100, debuff(ATTACKER, 2, [m('ccRate', -25)]))),
-    p('chakra', self(m('hp', 25)), attacked(100, debuff(ATTACKER, 2, [m('atk', -25, 'icon')]))),
-    p('agility', self(m('air', 20)), attacked(100, debuff(ATTACKER, 2, [m('dr', -20)]))),
-    p('power', self(m('hp', 25)), attacked(100, debuff(ATTACKER, 2, [m('finalReduction', -25)]))),
+    p('force', self(m('air', 20)), attacked(100, debuff(ENEMIES, 2, [m('ccRate', -25)]))),
+    p('chakra', self(m('hp', 25)), attacked(100, debuff(ENEMIES, 2, [m('atk', -25, 'icon')]))),
+    p('agility', self(m('air', 20)), attacked(100, debuff(ENEMIES, 2, [m('dr', -20)]))),
+    p('power', self(m('hp', 25)), attacked(100, debuff(ENEMIES, 2, [m('finalReduction', -25)]))),
   ], full: [self(m('weakenAtk', 20)), attacked(50, st(SELF, 'ccFree', 2, C))] },
   { id: 'acc-amegakure', name: 'Accessoires Amegakure', pairs: [
     p('force', self(m('def', 20)), attacked(30, { to: role('ally', 'supporter'), cleanse: 'debuff' })),
