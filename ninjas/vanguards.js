@@ -188,7 +188,7 @@ export const VANGUARDS = [
       { to: nature('ally', ['water', 'earth']), mods: [m('dr', 40), m('sAtk', 30)] },
       { to: nature('ally', 'fire'), mods: [m('finalReduction', 30), m('crit', 30), m('critDmg', 40)] },
       enemies(m('atk', -30)),
-      self(m('ignoreEnemyAtk', 7), m('ccRes', 55), m('reflectRes', 150)),
+      self(m('ignoreAtkReduction', 7), m('ccRes', 55), m('reflectRes', 150)),
       immune('superDodge', 'deathSeed', 'poisonousWind', 'weakened', 'disable', 'furyReduction'),
     ],
     awakenings: [{ name: 'Steam Armor', talents: [
