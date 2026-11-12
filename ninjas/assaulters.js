@@ -44,8 +44,8 @@ export const ASSAULTERS = [
       immune('superDodge', 'sSuperDodge', 'deathSeed', 'furyReduction', 'poisonousWind', 'windBound', 'weakened'),
     ],
     awakenings: [
-      { name: 'Demonic Light Whip', talents: [self(m('ignoreEnemyAtk', 10), m('ignoreDef', 20)), allies(m('ccRate', 30), m('finalDmg', 35), m('punch', 25)), enemies(m('atk', -18), m('def', -40))] },
-      { name: 'Poison Claw', replacePrevious: true, talents: [self(m('ignoreEnemyAtk', 10)), allies(m('finalReduction', 40), m('def', 40), m('immuneIgnoreDef', 30)),
+      { name: 'Demonic Light Whip', talents: [self(m('ignoreAtkReduction', 10), m('ignoreDef', 20)), allies(m('ccRate', 30), m('finalDmg', 35), m('punch', 25)), enemies(m('atk', -18), m('def', -40))] },
+      { name: 'Poison Claw', replacePrevious: true, talents: [self(m('ignoreAtkReduction', 10)), allies(m('finalReduction', 40), m('def', 40), m('immuneIgnoreDef', 30)),
         rl('ally', 'supporter', m('ccRes', 10)), enemies(m('ccRate', -25), m('atk', -33), m('dr', -40), m('punch', -45))] },
     ],
     special: {

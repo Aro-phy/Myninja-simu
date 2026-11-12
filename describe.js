@@ -9,7 +9,7 @@ const STAT = {
   critDmgTaken: 'dégâts critiques reçus', hit: 'précision', dodge: 'esquive', crit: 'critique', antiCrit: 'contre', block: 'blocage',
   sAtk: 'attaque S', sBlock: 's.block', sCrit: 's.crit', punch: 'Tour Bonus', aid: 'Aide', extraTurn: 'Tour Bonus', speed: 'vitesse',
   ccRate: 'taux de contrôle', ccRes: 'résistance au contrôle', reflectRes: 'résistance au renvoi', ignoreDef: 'ignore défense',
-  immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', recovery: 'taux de soin reçu',
+  immuneIgnoreDef: 'résistance à l\'ignore défense', ignoreEnemyAtk: 'ignore attaque ennemie', ignoreAtkReduction: 'ignore la réduction d\'attaque', recovery: 'taux de soin reçu',
   recoveryCut: 'baisse du taux de soin', healCut: 'réduction de soin', penBonus: 'dégâts de pénétration', penMalus: 'résistance à la pénétration',
   pdefShield: 'bouclier de défense physique', mdefShield: 'bouclier de défense stratégique', dotBonus: 'dégâts des DoT',
   shieldPierce: 'résistance aux boucliers de défense', weakenAtk: 'Weaken enemy\'s ATK', weakenDef: 'Weaken enemy\'s DEF', immuneWeakenDef: 'Immune Weaken DEF', sCritRes: 'résistance au s.crit', sBlockRes: 'résistance au s.block', defCutRes: 'résistance à la réduction de défense',

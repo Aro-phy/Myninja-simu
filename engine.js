@@ -199,7 +199,13 @@ const stat = (u, s) => (u.disabled?.has(s) ? 0 : (u.stats[s] || 0) + modSum(u, s
 
 function atkParts(u, type = u.attackType) {
   const key = type === 'magic' ? 'matk' : 'patk';
-  const mods = [...allMods(u, 'atk'), ...allMods(u, key)];
+  let mods = [...allMods(u, 'atk'), ...allMods(u, key)];
+  // « Ignore X % attack reduction » : X points de réduction d'attaque en moins, répartis sur les malus d'attaque subis.
+  const ign = modSum(u, 'ignoreAtkReduction');
+  if (ign > 0) {
+    const red = -mods.filter((m) => m.value < 0).reduce((a, m) => a + m.value, 0);
+    if (red > 0) { const f = Math.max(0, 1 - ign / red); mods = mods.map((m) => (m.value < 0 ? { ...m, value: m.value * f } : m)); }
+  }
   return {
     atk: u.stats.atk || 0,
     talents: mods.filter((m) => m.kind === 'talent').map((m) => m.value),
