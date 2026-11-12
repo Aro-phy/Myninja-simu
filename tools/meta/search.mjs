@@ -2,7 +2,10 @@
 // (meilleures formations trouvées jusqu'ici + formations au hasard) ; les meilleurs sont gardés et modifiés.
 import { Worker } from 'node:worker_threads';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { POOL, NATURE_LIST, GEAR_IDS, ACC_IDS, key, describe } from './common.mjs';
+import { POOL, NATURE_LIST, GEAR_IDS, ACC_IDS, key, describe, byId } from './common.mjs';
+import { talentAwakenings } from '../../engine.js';
+// ninjas avec plusieurs éveils de talent qui s'excluent (Kyo, Natsu, Hinata soccer, Sesshomaru…) : l'éveil fait partie du génome
+const AW_CHOICE = (id) => (id && byId[id] && talentAwakenings(byId[id]).some((a) => a.replacePrevious) ? talentAwakenings(byId[id]).length : 0);
 import { REFERENCE } from './reference.mjs';
 
 const GENS = Number(process.env.GENS || 40), POP = Number(process.env.POP || 48), N = Number(process.env.N || 12);
@@ -38,11 +41,15 @@ function randomGenome() {
     return g;
   }
 }
-const clone = (g) => ({ v: g.v, a: [...g.a], s: [...g.s], nat: { ...g.nat }, mainType: g.mainType, eq: structuredClone(g.eq || {}) });
+const clone = (g) => ({ v: g.v, a: [...g.a], s: [...g.s], nat: { ...g.nat }, mainType: g.mainType, eq: structuredClone(g.eq || {}), ...(g.aw ? { aw: { ...g.aw } } : {}) });
 function mutate(g0) {
   const g = clone(g0);
   const ids = () => [g.v, ...g.a, ...g.s].filter(Boolean);
   const r0 = rnd();
+  if (r0 < 0.06) { // éveil : un ninja à éveils exclusifs change de niveau
+    const cand = ids().filter((id) => AW_CHOICE(id));
+    if (cand.length) { const id = pick(cand); g.aw = { ...(g.aw || {}) }; g.aw[id] = 1 + Math.floor(rnd() * AW_CHOICE(id)); return g; }
+  }
   if (r0 < 0.4) { // équipement : le set de 6 pièces, une paire d'accessoires, ou les 8 accessoires d'un même set
     const id = pick(['main', ...ids()]);
     const e = g.eq[id] || (g.eq[id] = randomEq());

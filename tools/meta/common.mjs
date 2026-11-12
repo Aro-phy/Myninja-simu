@@ -108,7 +108,7 @@ export function winRate(A, B, n, seed) {
 
 export const key = (g) => [g.v || '-', [...g.a].sort().join(','), [...g.s].sort().join(','), g.mainType,
   [g.v, ...g.a, ...g.s].filter(Boolean).sort().map((id) => g.nat[id][0]).join(''),
-  ['main', g.v, ...g.a, ...g.s].filter(Boolean).sort().map((id) => JSON.stringify(g.eq?.[id] || null)).join(';')].join('|');
+  ['main', g.v, ...g.a, ...g.s].filter(Boolean).sort().map((id) => JSON.stringify(g.eq?.[id] || null)).join(';'), JSON.stringify(g.aw || {})].join('|');
 // même ninjas (sans regarder natures ni équipement)
 export const core = (g) => [g.v || '-', [...g.a].sort().join(','), [...g.s].sort().join(',')].join('|');
 const setName = (id) => [...GEAR_SETS, ...ACCESSORY_SETS].find((x) => x.id === id)?.name.replace(/^Accessoires /, '') || '—';
