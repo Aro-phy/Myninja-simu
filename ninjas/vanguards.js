@@ -26,7 +26,7 @@ export const VANGUARDS = [
       enemies(m('ccRate', -25), m('atk', -30), m('dr', -35), m('punch', -45)),
       { on: 'attacked', chance: 30, effects: [cleanseAllies] },
       { on: 'death', once: true, effects: [{ revive: 60 }, cleanseAllies] },
-      self(m('ignoreEnemyAtk', 10), m('ccRes', 55), m('reflectRes', 150)),
+      self(m('ignoreAtkReduction', 10), m('ccRes', 55), m('reflectRes', 150)),
       immune('superDodge', 'sSuperDodge', 'deathSeed', 'furyReduction', 'imprison', 'weakened'),
     ],
     awakenings: [{ name: 'Power of Akatsuki', talents: [self(m('sBlock', 60))] }],
