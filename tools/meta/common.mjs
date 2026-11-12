@@ -6,6 +6,12 @@ import { GEAR_SETS, ACCESSORY_SETS, equipmentEntries, slotsToChoice } from '../.
 import { testStats, RELEASES } from './ninja-stats.mjs';
 
 export const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
+// TEAM_SPEED=id:valeur,… : test hypothétique, remplace le talent de vitesse d'équipe de ces ninjas (aussi dans les workers).
+for (const [id, v] of (process.env.TEAM_SPEED || '').split(',').filter(Boolean).map((x) => x.split(':'))) {
+  const t = byId[id]?.talents.flatMap((x) => x.mods || []).find((m) => m.stat === 'speed' && m.value >= 100);
+  if (!t) throw new Error(`TEAM_SPEED : pas de talent de vitesse d'équipe pour ${id}`);
+  t.value = Number(v);
+}
 // POOL=recent : seulement les ninjas encore méta (6 dernières avant-gardes, 14 derniers attaquants, 18 derniers supports).
 const recent = (role, k) => RELEASES.filter((id) => byId[id]?.role === role).slice(-k);
 export const POOL = process.env.POOL === 'recent'

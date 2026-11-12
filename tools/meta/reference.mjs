@@ -21,6 +21,7 @@ function toGenome({ name, slots }) {
     } else {
       if (key[0] === 'V') g.v = id; else if (key[0] === 'A') g.a.push(id); else g.s.push(id);
       g.nat[id] = m.nature && m.nature !== 'none' ? m.nature : 'water';
+      if (m.awakening != null) (g.aw ||= {})[id] = m.awakening;
     }
     const gear = m.equip?.gear || [], acc = m.equip?.acc || [];
     // une paire d'accessoires ne compte que si ses 2 pièces sont du même set

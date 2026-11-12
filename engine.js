@@ -473,6 +473,7 @@ export function simulate(teamA, teamB, opts = {}) {
   // msg : texte du coup, journalisé avant l'éventuel K.O.
   function damage(tgt, amount, src, kind, msg) {
     if (!tgt.alive) return;
+    if (src && src.team !== tgt.team) src.dmgDone = (src.dmgDone || 0) + amount; // dégâts infligés (stat de fin de combat)
     tgt.hp -= amount;
     if (msg) L(msg.type, msg.text(), msg.extra);
     if (tgt.hp <= 0) kill(tgt, src, kind);
@@ -853,7 +854,7 @@ export function simulate(teamA, teamB, opts = {}) {
     hpLeft,
     rounds: round,
     log,
-    units: units.map((u) => ({ uid: u.uid, team: u.team, name: u.name, role: u.role, hp: u.hp, maxHp: u.maxHp, alive: u.alive, fury: u.fury })),
+    units: units.map((u) => ({ uid: u.uid, team: u.team, name: u.name, role: u.role, hp: u.hp, maxHp: u.maxHp, alive: u.alive, fury: u.fury, dmgDone: u.dmgDone || 0 })),
   };
 }
 
