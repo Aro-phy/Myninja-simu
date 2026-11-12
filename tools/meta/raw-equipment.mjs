@@ -27,7 +27,7 @@ export const GEAR_PIECE = {
   'gear-deatbone': { atk: 28000, pdef: 26000, mdef: 30000 }, 'gear-corruptor': { atk: 26000, pdef: 24000, mdef: 28000 },
   'gear-oblivion': { atk: 24000, pdef: 22000, mdef: 26000 }, 'gear-stormrage': { atk: 22000, pdef: 20000, mdef: 24000 },
   'gear-frost-fire': { atk: 20000, pdef: 18000, mdef: 22000 },
-  'gear-defiance': 73000, 'gear-black-feather': 72000, 'gear-warlord': 66000, 'gear-warlord-r5': 71000,
+  'gear-legendary': 79000, 'gear-defiance': 73000, 'gear-black-feather': 72000, 'gear-warlord': 66000, 'gear-warlord-r5': 71000,
 };
 
 const a = (agility) => ({ agility });
@@ -89,6 +89,7 @@ export const GEAR_TIER = {
   'gear-frost-fire': { 2: a(8000), 4: a(10000), 6: a(15000) },
   'gear-warlord': { 2: { force: 15000, agility: 15000, chakra: 15000 }, 4: a(20000), 6: a(20000) },
   'gear-warlord-r5': { 2: { force: 18000, agility: 18000, chakra: 18000 }, 4: a(23000), 6: a(20000) },
+  'gear-legendary': { 2: af(25000, 25000), 4: af(35000, 35000) },
   'gear-defiance': { 2: { chakra: 25000, agility: 25000 }, 4: { chakra: 35000, agility: 35000 } },
 };
 
@@ -106,7 +107,7 @@ export const ACC_PIECE = {
   'acc-hyuga': { force: 48000, chakra: 48000, agility: 50000 }, 'acc-uchiha': { force: 47000, chakra: 47000, agility: 49000 },
   'acc-saint': 40000, 'acc-senju': { force: 46000, chakra: 46000, agility: 48000 }, 'acc-ashura': { force: 45000, chakra: 45000, agility: 47000 },
   'acc-indora': { force: 43000, chakra: 43000, agility: 45000 }, 'acc-bloodfang': { force: 43000, chakra: 43000, agility: 44000 },
-  'acc-defiance': 64000, 'acc-violet': 63500, 'acc-black-feather': 63000, // 3e vidéo
+  'acc-legendary': 68000, 'acc-defiance': 64000, 'acc-violet': 63500, 'acc-black-feather': 63000, // 3e vidéo
   'acc-darkmantle': 30000, 'acc-deatbone': 30000, 'acc-corruptor': 30000, // environ (donné par le joueur)
   'acc-otsutsuki': 42000, 'acc-warlord': 60000, 'acc-warlord-r2': 65000, 'acc-heroism': { force: 40000, chakra: 40000, agility: 42000 }, 'acc-devout': { force: 34000, chakra: 34000, agility: 38000 },
 };

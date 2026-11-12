@@ -34,6 +34,32 @@ const either = (...groups) => ({ oneOf: groups });
 export const ASSAULTERS = [
   // ---------- Haut niveau (vitesse d'équipe 118 %) ----------
   {
+    id: 'sesshomaru', name: 'Sesshomaru', role: A, gender: 'male', base: { speed: 88, dr: 80, air: 80 },
+    talents: [
+      allies(m('speed', 120), m('dr', 30), m('hp', 40), m('atk', 33)),
+      rl('ally', 'vanguard', m('block', 25)),
+      attacked(30, dispelEnemies),
+      self(m('atk', 7)),
+      resist(55, 150),
+      immune('superDodge', 'sSuperDodge', 'deathSeed', 'furyReduction', 'poisonousWind', 'windBound', 'weakened'),
+    ],
+    awakenings: [
+      { name: 'Demonic Light Whip', talents: [self(m('ignoreEnemyAtk', 10), m('ignoreDef', 20)), allies(m('ccRate', 30), m('finalDmg', 35), m('punch', 25)), enemies(m('atk', -18), m('def', -40))] },
+      { name: 'Poison Claw', replacePrevious: true, talents: [self(m('ignoreEnemyAtk', 10)), allies(m('finalReduction', 40), m('def', 40), m('immuneIgnoreDef', 30)),
+        rl('ally', 'supporter', m('ccRes', 10)), enemies(m('ccRate', -25), m('atk', -33), m('dr', -40), m('punch', -45))] },
+    ],
+    special: {
+      name: 'Frost Burial', hits: [allHit(300), { target: highestHp('enemy'), pct: 100, attackType: 'physical' }], fury: FURY_68,
+      effects: [
+        heal(50),
+        st(rand('enemy', 1), 'upwind', 2, { value: 20 }),
+        st(rand('enemy', 2), 'corrosion', 2, { value: 20 }),
+        st(rand('enemy', 2), 'armorBreak', 2, { value: 30 }),
+        cleanseAllies,
+      ],
+    },
+  },
+  {
     id: 'sasuke-taka', name: 'Sasuke [Taka]', role: A, gender: 'male', base: { speed: 87, dr: 75, air: 75 },
     talents: [
       allies(m('speed', 118), m('hp', 40), m('atk', 30), m('finalDmg', 25), m('ccRes', 25), m('def', 30), m('immuneIgnoreDef', 20)),

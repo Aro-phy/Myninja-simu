@@ -197,6 +197,13 @@ export const GEAR_SETS_2 = [
     4: [self(m('weakenDef', 30), m('ccRes', 20))],
     6: [self(m('air', 30), m('finalDmg', 30))],
   } },
+  // Legendary (pièce 79 000, Puissance 790 000).
+  { id: 'gear-legendary', name: 'Legendary', tiers: {
+    2: [self(m('atk', 20), m('air', 25))], // + Agilité / Force 25 000
+    4: [self(m('hp', 25), m('finalDmg', 15), m('weakenAtk', 33), m('ccRes', 15)),
+      attacked(50, st(rand('ally', 2), 'superDefense', 2, { value: 20, ...C }))], // + Agilité / Force 35 000
+    6: [self(m('dr', 35), m('finalReduction', 20), m('air', 15), m('ccRes', 20), m('atk', 13)), afterSkill(st(SELF, 'superarmor', 2))], // + Puissance 60 000
+  } },
   // Warlord : seul équipement évolutif (R1 à R5). Version saisie : R4.
   { id: 'gear-warlord', name: 'Warlord [R4]', tiers: {
     2: [self(m('aid', 25), m('punch', 30))], // + Force / Agilité / Chakra / Puissance 15 000
@@ -388,6 +395,13 @@ export const ACCESSORY_SETS_2 = [
     p('agility'),
     p('power', attacked(40, { to: SELF, cleanse: 'debuff' })),
   ], full: [] },
+  // Accessoires Legendary (pièce 68 000, Puissance 680 000).
+  { id: 'acc-legendary', name: 'Accessoires Legendary', pairs: [
+    p('force', self(m('dr', 40), m('finalDmg', 20))),
+    p('chakra', self(m('atk', 28)), afterSkill(debuff(rand('enemy', 3), 2, [m('def', -30, 'icon')]))),
+    p('agility', self(m('finalDmg', 30)), afterSkill(st(rand('enemy', 2), 'corrosion', 2, { value: 20 }))),
+    p('power', self(m('atk', 23)), afterSkill({ to: lowestHp('enemy'), strike: 180, attackType: 'magic' })),
+  ], full: [self(m('weakenDef', 70), m('weakenAtk', 20), m('dr', 35)), afterSkill(together(50, st(role('ally', 'assaulter'), 'acceleration', 2, { value: 15, cleansable: false })))] },
   // Accessoires Warlord (R1 ou R2). Version saisie : R1.
   { id: 'acc-warlord', name: 'Accessoires Warlord [R1]', pairs: [
     p('force', self(m('atk', 25), m('ccRes', 40), m('air', 5))), // + Force 40 000

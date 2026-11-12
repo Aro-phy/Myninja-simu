@@ -19,7 +19,7 @@ export const RELEASES = ['premier-hokage', 'boruto', 'neji-ying-yang', 'uzumaki-
   'kusanagi-kyo', 'mitarashi-anko', 'uchiha-sarada', 'hayate-yugao', '7-tails-fuu', 'legende-madara', 'awaken-mitsuki', 'hiruko-sasori',
   'danzo-root-hokage', 'sai-knight', 'karin-guyver', 'eveil-de-kawaki', 'natsu-dragneel', 'xmas-temari', 'shikamaru-nara',
   'gai-porte-de-la-mort', 'madara-moon-eyes', 'kakashi-kamui', 'naruto-six-tails-mode', 'hinata-soccer', 'sakura-tsunade',
-  'orochimaru-akatsuki', 'sasuke-taka', 'hidan-kakuzu'];
+  'orochimaru-akatsuki', 'sasuke-taka', 'hidan-kakuzu', 'sesshomaru'];
 
 const BASE_RAW = {
   supporter: { force: 22000, chakra: 44000, agility: 44500, hp: 440000 }, // PV = Chakra × 10
