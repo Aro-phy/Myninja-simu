@@ -8,7 +8,7 @@ export const HP_SCALE = Number(process.env.HP_SCALE || 4.7);
 // Chakra → attaque magique ×2 et défense magique ×1, Agilité → vitesse ×2, Endurance → PV ×5.
 import { NINJAS } from '../../data.js';
 import { resolveKit } from '../../engine.js';
-import { GEAR_PIECE, GEAR_TIER, ACC_PIECE, ACC_PAIR, ACC_FULL } from './raw-equipment.mjs';
+import { equipRaw } from '../../equip-raw.js';
 
 const byId = Object.fromEntries(NINJAS.map((n) => [n.id, n]));
 
@@ -78,38 +78,6 @@ export function ninjaType(id) {
   }
   const dps = f.cc && f.atk && f.dmg, tank = f.tcc && f.tdef && f.tair;
   return dps && tank ? 'DPS et tank' : dps ? 'DPS' : tank ? 'tank' : 'hybride';
-}
-
-// Stats de l'équipement : brutes (Force, Chakra, Agilité) des paliers, paires et accessoires,
-// et finales (attaque, défenses, vitesse) des 6 pièces d'équipement.
-function equipRaw(eq) {
-  const raw = { force: 0, chakra: 0, agility: 0, endurance: 0, atk: 0, pdef: 0, mdef: 0, speed: 0 };
-  const add = (o) => { for (const [k, v] of Object.entries(o || {})) raw[k] += v; };
-  if (eq?.gear) {
-    // gear : un set pour les 6 pièces, ou 6 sets dans l'ordre des cases
-    // (Attaque physique, Défense physique, Attaque stratégique, Défense stratégique, Vitesse, Puissance)
-    const slots = Array.isArray(eq.gear) ? eq.gear : Array(6).fill(eq.gear);
-    const count = {};
-    for (const id of slots) if (id) count[id] = (count[id] || 0) + 1;
-    for (const [id, c] of Object.entries(count)) for (const t of [2, 4, 6]) if (c >= t) add(GEAR_TIER[id]?.[t]);
-    const piece = (i) => {
-      const p = GEAR_PIECE[slots[i]];
-      if (p == null) return { atk: 0, pdef: 0, mdef: 0 };
-      return typeof p === 'number' ? { atk: p, pdef: p, mdef: p } : { atk: p.atk, pdef: p.pdef ?? p.def ?? p.atk, mdef: p.mdef ?? p.def ?? p.atk };
-    };
-    raw.patkPiece = piece(0).atk; raw.matkPiece = piece(2).atk;
-    add({ pdef: piece(1).pdef, mdef: piece(3).mdef, speed: piece(4).atk });
-  }
-  const acc = Array.isArray(eq?.acc) ? eq.acc : eq?.acc ? Array(4).fill(eq.acc) : [];
-  ['force', 'chakra', 'agility', 'power'].forEach((pair, i) => {
-    const id = acc[i];
-    if (!id) return;
-    add(ACC_PAIR[id]?.[pair]);
-    const p = ACC_PIECE[id];
-    if (p != null && pair !== 'power') raw[pair] += 2 * (typeof p === 'number' ? p : p[pair]); // 2 pièces par paire
-  });
-  if (acc.length === 4 && acc.every((x) => x && x === acc[0])) add(ACC_FULL[acc[0]]);
-  return raw;
 }
 
 // Stats de test d'un ninja (id, ou 'main' pour le personnage principal) avec son équipement.

@@ -4,6 +4,8 @@ import { GEAR_SETS, ACCESSORY_SETS, GEAR_SLOTS, ACC_SLOTS, equipmentEntries, slo
 import * as D from './describe.js';
 import { readStatsImage } from './ocr.js';
 import { STAT_FIELDS, formationToFile, parseFormationFile, fileName } from './formation-file.js';
+import { toTeam, withAtk } from './team.js';
+import { runOptimizer, optimizableIds, describeEquip } from './optimizer.js';
 
 const STORE_KEY = 'myninja-sim-v3';
 const RULES_VERSION = 7; // incrémenté quand les règles par défaut changent
@@ -59,6 +61,7 @@ function demoState() {
   };
 }
 
+let optRun = null; // optimisation d'équipement en cours (signal d'arrêt)
 let state = load() || demoState();
 state.saved ||= [];
 function load() {
@@ -96,28 +99,6 @@ const parseNum = (s) => {
   const v = parseFloat(String(s).replace(/\s| /g, '').replace(',', '.').replace('%', ''));
   return Number.isFinite(v) ? v : 0;
 };
-
-// Anciennes fiches (attaque physique et magique séparées) → une seule « Attaque ».
-function withAtk(stats = {}) {
-  if (stats.atk != null) return stats;
-  const { patk, matk, ...rest } = stats;
-  return { ...rest, atk: baseAttack(stats) };
-}
-
-function toTeam(t) {
-  const members = [];
-  for (const [key, m] of Object.entries(t.slots)) {
-    if (!m || !byId[m.ninjaId]) continue;
-    members.push({
-      ninja: byId[m.ninjaId], pos: Number(key.slice(1)), stats: withAtk(m.stats), label: m.label || undefined,
-      attackType: byId[m.ninjaId].isMain ? m.attackType : undefined,
-      mainTalents: byId[m.ninjaId].isMain ? m.mainTalents : undefined,
-      nature: byId[m.ninjaId].isMain ? 'none' : m.nature || 'none', natureLevel: m.natureLevel || 1, awakening: m.awakening, skillAwakening: m.skillAwakening,
-      equipment: equipmentEntries(slotsToChoice(m.equip || choiceToSlots(m.gear))),
-    });
-  }
-  return { name: t.name, members };
-}
 
 // ---------- Formations ----------
 
@@ -698,6 +679,7 @@ function refreshSources() {
     const s = $(`#${id}`); if (!s) continue;
     const v = s.value; s.replaceChildren(...sourceOptions(v));
   }
+  if ($('#optA') && !optRun) renderOptim();
 }
 
 // ---------- Page « Comparatif des bonus » ----------
@@ -762,10 +744,105 @@ function renderRawForm() {
       oninput: (e) => { rawStats[k] = parseNum(e.target.value); } }))));
 }
 
+// ---------- Page « Optimisation de l'équipement » ----------
+
+const PRECISION = { rapide: { n: 8, passes: 1 }, normal: { n: 16, passes: 1 }, precis: { n: 30, passes: 2 } };
+const ninjaLabel = (id) => (byId[id]?.isMain ? 'Personnage principal' : byId[id]?.name || id);
+
+function renderOptim() {
+  const sel = $('#optA');
+  const v = sel.value || 'cur0';
+  sel.replaceChildren(...sourceOptions(v));
+  const src = getSource(sel.value);
+  const ids = [...new Set(Object.values(src.slots).filter((m) => m && byId[m.ninjaId]).map((m) => m.ninjaId))];
+  $('#optIds').replaceChildren(el('legend', {}, 'Ninjas à optimiser'),
+    ...ids.map((id) => el('label', { class: 'inline' }, el('input', { type: 'checkbox', value: id, checked: true }), ninjaLabel(id))));
+  const prev = new Set([...document.querySelectorAll('#optOpps input:checked')].map((x) => x.value));
+  const opts = [['cur0', `Actuelle à gauche · ${state.teams[0].name}`], ['cur1', `Actuelle à droite · ${state.teams[1].name}`],
+    ...state.saved.map((f) => [`saved:${f.id}`, `Enregistrée · ${f.name}`])].filter(([k]) => k !== sel.value);
+  $('#optOpps').replaceChildren(el('legend', {}, 'Adversaires'),
+    ...opts.map(([k, l]) => el('label', { class: 'inline' }, el('input', { type: 'checkbox', value: k, checked: prev.size ? prev.has(k) : k === 'cur1' }), l)));
+}
+
+async function runOptim() {
+  if (optRun) return;
+  const src = getSource($('#optA').value);
+  const ids = [...document.querySelectorAll('#optIds input:checked')].map((x) => x.value);
+  const opps = [...document.querySelectorAll('#optOpps input:checked')].map((x) => getSource(x.value)).filter((o) => Object.values(o.slots).some(Boolean));
+  const modes = { classic: $('#optClassic').checked, cascade: $('#optCascade').checked, restricted: $('#optRestricted').checked };
+  const err = $('#optErr');
+  const A = toTeam(src);
+  const errs = [...validateTeam(A).map((e) => `${src.name} : ${e}`), ...opps.flatMap((o) => validateTeam(toTeam(o)).map((e) => `${o.name} : ${e}`))];
+  if (!ids.length) errs.push('Choisis au moins un ninja à optimiser.');
+  if (!opps.length) errs.push('Choisis au moins une formation adverse.');
+  if (!modes.classic && !modes.cascade) errs.push('Coche au moins l\'optimisation classique ou en cascade.');
+  err.textContent = errs.join(' ');
+  if (errs.length) return;
+  const { n, passes } = PRECISION[$('#optPrec').value];
+  const signal = { stopped: false };
+  optRun = signal;
+  const btn = $('#optRun'), stop = $('#optStop'), bar = $('#optBar'), txt = $('#optTxt'), log = $('#optLog');
+  btn.disabled = true; stop.hidden = false; bar.hidden = false; bar.value = 0; log.replaceChildren(); $('#optResult').hidden = true;
+  const t0 = Date.now();
+  try {
+    const res = await runOptimizer({
+      base: { name: src.name, slots: structuredClone(src.slots) }, opps: opps.map((o) => ({ name: o.name, slots: structuredClone(o.slots) })),
+      rules: state.rules, ids, modes, n, passes, signal,
+      onProgress: (d, t) => {
+        bar.max = t; bar.value = Math.min(d, t);
+        const el2 = (Date.now() - t0) / 1000, left = d > 5 ? (el2 / d) * Math.max(0, t - d) : null;
+        txt.textContent = `${Math.round((100 * d) / t)} %${left != null ? ` · encore environ ${left > 90 ? `${Math.round(left / 60)} min` : `${Math.round(left)} s`}` : ''}`;
+      },
+      onStep: (t) => { log.append(el('li', {}, t)); log.scrollTop = log.scrollHeight; },
+    });
+    renderOptimResult(src, res, ids);
+  } catch (e) {
+    err.textContent = `Erreur pendant l'optimisation : ${e.message}`;
+  } finally {
+    optRun = null; btn.disabled = false; stop.hidden = true; bar.hidden = true; txt.textContent = '';
+  }
+}
+
+function renderOptimResult(src, res, ids) {
+  const panel = $('#optResult');
+  const pct = (s) => `${nf.format(100 * s.w)} %`, rd = (s) => `${nf.format(s.r)} rounds`;
+  const changed = ids.filter((id) => JSON.stringify(res.equips[id]) !== JSON.stringify(res.original[id]));
+  const rows = ids.map((id) => {
+    const a = describeEquip(res.original[id]), b = describeEquip(res.equips[id]), ch = changed.includes(id);
+    return el('tr', {}, el('th', {}, ninjaLabel(id)), el('td', {}, a.gear, el('br'), el('span', { class: 'note' }, a.acc)),
+      el('td', { class: ch ? 'pos' : 'zero' }, ch ? [b.gear, el('br'), el('span', { class: 'note' }, b.acc)] : 'inchangé'));
+  });
+  const name = `${src.name} (optimisée)`;
+  panel.hidden = false;
+  panel.replaceChildren(
+    el('h2', {}, 'Résultat de l\'optimisation'),
+    el('div', { class: 'stats-line' },
+      el('span', {}, 'Avant : ', el('b', {}, pct(res.before)), ` · ${rd(res.before)}`),
+      el('span', {}, 'Après : ', el('b', {}, pct(res.after)), ` · ${rd(res.after)}`)),
+    el('p', { class: 'note' }, 'Victoires et durée moyenne contre les adversaires choisis, mesurées sur d\'autres tirages que ceux de l\'optimisation.'),
+    changed.length ? el('div', { class: 'tbl-wrap' }, el('table', { class: 'cmp opt' },
+      el('thead', {}, el('tr', {}, el('th', {}, 'Ninja'), el('th', {}, 'Avant'), el('th', {}, 'Après'))), el('tbody', {}, rows)))
+      : el('p', {}, 'Aucun changement ne fait mieux que l\'équipement actuel contre ces adversaires.'),
+    el('details', {}, el('summary', {}, 'Étapes'), el('ul', { class: 'opt-log' },
+      res.steps.map((s) => el('li', {}, `${s.label} : ${pct(s.s)} · ${rd(s.s)}${s.label === 'Départ' ? '' : s.kept ? ' — gardée' : ' — rejetée'}`)))),
+    changed.length ? el('div', { class: 'swap-btns' },
+      el('button', { type: 'button', class: 'btn small', onclick: () => { state.teams[0] = { name, slots: structuredClone(res.slots) }; save(); renderTeam(0); refreshSources(); $('#optMsg').textContent = `« ${name} » ouverte à gauche.`; } }, 'Ouvrir à gauche'),
+      el('button', { type: 'button', class: 'btn small', onclick: () => {
+        const ex = state.saved.find((f) => f.name === name);
+        const entry = { id: ex?.id || newId(), name, slots: structuredClone(res.slots), savedAt: Date.now() };
+        if (ex) Object.assign(ex, entry); else state.saved.push(entry);
+        save(); renderSaved(); renderTeam(0); renderTeam(1); refreshSources(); $('#optMsg').textContent = `« ${name} » enregistrée.`;
+      } }, 'Enregistrer comme nouvelle formation')) : null,
+    el('span', { class: 'note', id: 'optMsg', role: 'status' }),
+    el('p', { class: 'note' }, 'Les stats de la formation optimisée sont ajustées de l\'écart estimé entre l\'ancien et le nouvel équipement (attaque, défenses, vitesse, PV) : vérifie-les avec les vraies valeurs du jeu.'));
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // ---------- Onglets ----------
 
+const PAGES = ['combat', 'compare', 'raw', 'optim'];
 function showPage(id) {
-  for (const p of ['combat', 'compare', 'raw']) {
+  for (const p of PAGES) {
     $(`#page-${p}`).hidden = p !== id;
     $(`#tab-${p}`).setAttribute('aria-selected', p === id ? 'true' : 'false');
   }
@@ -774,9 +851,12 @@ function showPage(id) {
 
 $('#runOne').addEventListener('click', runOne);
 $('#runMany').addEventListener('click', runMany);
-for (const p of ['combat', 'compare', 'raw']) $(`#tab-${p}`).addEventListener('click', () => showPage(p));
+for (const p of PAGES) $(`#tab-${p}`).addEventListener('click', () => showPage(p));
 for (const [id, def] of [['cmpA', 'cur0'], ['cmpB', 'cur1'], ['rawA', 'cur0'], ['rawB', 'cur1']]) $(`#${id}`).replaceChildren(...sourceOptions(def));
 $('#runCompare').addEventListener('click', runCompare);
+$('#optA').addEventListener('change', renderOptim);
+$('#optRun').addEventListener('click', runOptim);
+$('#optStop').addEventListener('click', () => { if (optRun) { optRun.stopped = true; $('#optTxt').textContent = 'Arrêt… vérification du meilleur résultat trouvé.'; } });
 $('#rawOne').addEventListener('click', () => { const t = rawTeams(); if (t) renderResult($('#rawResult'), t, Math.round(parseNum($('#rawSeed').value)), 'raw'); });
 $('#rawMany').addEventListener('click', async () => { const t = rawTeams(); if (t) await renderMany($('#rawManyPanel'), t, Math.round(parseNum($('#rawN').value)), Math.round(parseNum($('#rawSeed').value)), $('#rawMany')); });
 renderRawForm();
@@ -784,6 +864,7 @@ renderTeam(0);
 renderTeam(1);
 renderRules();
 renderSaved();
+renderOptim();
 let startTab = 'combat';
-try { startTab = ['combat', 'compare', 'raw'].includes(location.hash.slice(1)) ? location.hash.slice(1) : localStorage.getItem('myninja-tab') || 'combat'; } catch { /* ignoré */ }
-showPage(['combat', 'compare', 'raw'].includes(startTab) ? startTab : 'combat');
+try { startTab = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : localStorage.getItem('myninja-tab') || 'combat'; } catch { /* ignoré */ }
+showPage(PAGES.includes(startTab) ? startTab : 'combat');
