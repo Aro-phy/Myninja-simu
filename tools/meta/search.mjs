@@ -41,6 +41,22 @@ function randomGenome() {
     return g;
   }
 }
+// FORCE=id : ce ninja est imposé dans toutes les formations (formation construite autour de lui).
+const FORCE = process.env.FORCE || null;
+function forceIn(g) {
+  if (!FORCE || [g.v, ...g.a, ...g.s].includes(FORCE)) return g;
+  const role = byId[FORCE].role;
+  const ids = [g.v, ...g.a, ...g.s].filter(Boolean);
+  // on retire un ninja du même poste s'il y en a un, sinon un ninja au hasard
+  let old = role === 'vanguard' ? g.v : (role === 'assaulter' ? g.a : g.s)[0];
+  if (!old) old = ids[Math.floor(rnd() * ids.length)];
+  if (g.v === old) g.v = null; else { g.a = g.a.filter((x) => x !== old); g.s = g.s.filter((x) => x !== old); }
+  if (role === 'vanguard') { if (g.v) return g; g.v = FORCE; }
+  else if (role === 'assaulter') { if (g.a.length >= 2) return g; g.a.push(FORCE); } else { if (g.s.length >= 3) return g; g.s.push(FORCE); }
+  g.nat[FORCE] = g.nat[old] || pick(NATURE_LIST); delete g.nat[old];
+  g.eq[FORCE] = g.eq[old] || randomEq(); delete g.eq[old];
+  return g;
+}
 const clone = (g) => ({ v: g.v, a: [...g.a], s: [...g.s], nat: { ...g.nat }, mainType: g.mainType, eq: structuredClone(g.eq || {}), ...(g.aw ? { aw: { ...g.aw } } : {}) });
 function mutate(g0) {
   const g = clone(g0);
@@ -90,7 +106,7 @@ function mutate(g0) {
   return g;
 }
 
-let pop = Array.from({ length: POP }, randomGenome);
+let pop = Array.from({ length: POP }, () => forceIn(randomGenome()));
 const hall = [];
 // RESUME=1 : reprend depuis le fichier OUT d'une recherche interrompue (meilleures formations et nombre de générations faites).
 let gen0 = 1;
@@ -100,7 +116,7 @@ if (process.env.RESUME && existsSync(OUT)) {
   gen0 = (prev.gen || 0) + 1;
   const seen = new Set(prev.pop.map(key));
   pop = [...prev.pop];
-  while (pop.length < POP) { const c = mutate(pop[Math.floor(rnd() * prev.pop.length)]); if (!seen.has(key(c))) { seen.add(key(c)); pop.push(c); } }
+  while (pop.length < POP) { const c = forceIn(mutate(pop[Math.floor(rnd() * prev.pop.length)])); if (!seen.has(key(c))) { seen.add(key(c)); pop.push(c); } }
   seed += gen0 * 7919;
   console.log(`reprise à la génération ${gen0}`);
 }
@@ -117,7 +133,7 @@ for (let gen = gen0; gen <= GENS; gen++) {
   const seen = new Set(elite.map(key));
   const next = [...elite];
   while (next.length < POP) {
-    const child = rnd() < 0.15 ? randomGenome() : mutate(rnd() < 0.3 ? mutate(pick(elite)) : pick(elite));
+    const child = forceIn(rnd() < 0.15 ? randomGenome() : mutate(rnd() < 0.3 ? mutate(pick(elite)) : pick(elite)));
     if (!seen.has(key(child))) { seen.add(key(child)); next.push(child); }
   }
   pop = next;
